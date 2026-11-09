@@ -13,7 +13,7 @@ New capabilities go through Spec Kit (`/speckit-specify` → `/speckit-plan` →
 | 002 | TaskFlow Swarm and reliability fixes | Issue/PR | TaskFlow-Systems/dokploy `AgentHits-Dev` | Merges cleanly onto upstream; drop its edits to `proprietary/` files; provenance check |
 | 003 | OIDC SSO with IdP group → role mapping, SSO-only mode, break-glass login | Spec Kit | Milpia/mlp-dokploy `specs/001-keycloak-sso` | Seed the spec from Milpia's (Apache); 26 conflicts and 4 migrations on top of 002 |
 | 004 | Audit log: always-on trail, viewer, filters, CSV export, retention | Spec Kit | Behavioural spec; ghaaf-labs/crane as design reference | Uses the existing `audit()` calls |
-| 005 | Upstream PRs for AWS and Swarm | Issue/PR | Dokploy PRs #4141 (ECR), #5270, #5702, #5828, #5187, #5218/#5776, #5205, #4405, #5038 (terminal) | Port as-is with credit |
+| 005 | Upstream PRs for AWS and Swarm | Issue/PR | Dokploy PRs #4141 (ECR), #5270, #5702, #5828, #5187, #5218/#5776, #5205, #4405, #5038 (terminal) | Port as-is with credit. Add a scheduled job that refreshes ECR tokens (IAM role) every 6h and re-applies registry auth to services, since Swarm workers ignore credential helpers and ECR tokens expire after 12h |
 | 006 | Consolidate migrations into one chain; test upgrade from an upstream database | Issue/PR | Own | After 002–005 land |
 | 007 | Rebrand, CI, image publishing, install script | Spec Kit | Own | Needs the product name |
 | 008 | End-to-end QA on a multi-node Swarm in AWS | Issue | Own | Release gate |
