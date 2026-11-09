@@ -83,7 +83,7 @@ present and the removed-feature records still exist unchanged.
 2. **Given** an application domain that was protected by SSO forward-auth, **When** the fork is
    running, **Then** the domain does not become publicly reachable without authentication.
 3. **Given** a user who was assigned a custom role, **When** they sign in after the upgrade,
-   **Then** they receive no more access than the built-in member role grants.
+   **Then** they keep exactly the permissions that role grants, no more.
 
 ---
 
@@ -107,13 +107,17 @@ matching entries exist in the audit store with actor, action, target and time.
 
 ### Edge Cases
 
-- A domain had SSO forward-auth enabled: requests must be refused rather than passed through
-  unauthenticated, and the admin can see why and disable the protection.
+- A domain had SSO forward-auth enabled: it stays protected; if the auth gate cannot answer,
+  requests are refused rather than passed through, and an admin can turn the protection off.
+- "Enforce SSO" was switched on: it is ignored until SSO sign-in returns, so password sign-in keeps
+  working and nobody is locked out.
+- A member had no servers or git providers assigned: per-member access lists now apply to every
+  organization, so the member sees only what was assigned and an admin can assign more.
 - A user's only sign-in method was SSO or GitHub/Google social login: the owner can still reach
   them by resetting their password or re-inviting them; the owner account always has a password
   sign-in path.
-- The organization's default role for new members was a custom role: new members get the built-in
-  member role instead.
+- The organization's default role for new members was a custom role that no longer exists: new
+  members get the built-in member role.
 - Whitelabeling was configured: the product shows its default branding; stored whitelabel settings
   are kept but ignored.
 - Bookmarked URLs for removed settings pages (license, SSO, audit logs, whitelabeling) return a
@@ -139,10 +143,15 @@ matching entries exist in the audit store with actor, action, target and time.
   navigation.
 - **FR-006**: The built-in owner, admin and member roles and their existing per-resource
   permissions MUST behave as on upstream, including denials.
-- **FR-007**: Users assigned a custom role MUST be treated as built-in members with no additional
-  grants until custom roles are rebuilt.
-- **FR-008**: Domains with SSO forward-auth enabled MUST fail closed (deny access) and the admin
-  MUST be able to turn the protection off per domain.
+- **FR-007**: Custom roles already stored MUST keep being enforced exactly as defined; creating
+  or editing them is unavailable until custom roles are rebuilt.
+- **FR-008**: Domains with SSO forward-auth enabled MUST stay protected and fail closed, and an
+  admin MUST be able to turn the protection off per domain.
+- **FR-016**: Capabilities that are open code but were locked behind the license (per-member server
+  and git-provider access lists, "remote servers only", custom-role default for new members) MUST
+  be available to every organization without a license.
+- **FR-017**: The "enforce SSO" setting MUST have no effect and MUST be hidden until SSO sign-in is
+  available again, so no account can be locked out.
 - **FR-009**: Actions that the open code records to the audit trail MUST continue to be written to
   the existing audit store; a write failure MUST NOT fail the action.
 - **FR-010**: In self-hosted mode the product MUST NOT contact any Dokploy-controlled endpoint for
