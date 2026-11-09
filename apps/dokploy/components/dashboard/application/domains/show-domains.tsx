@@ -491,7 +491,9 @@ export const ShowDomains = ({ id, type }: Props) => {
 														{canCreateDomain && type === "application" && (
 															<HandleForwardAuth
 																domainId={item.domainId}
+																host={item.host}
 																applicationId={id}
+																forwardAuthEnabled={item.forwardAuthEnabled}
 															/>
 														)}
 														{canDeleteDomain && (

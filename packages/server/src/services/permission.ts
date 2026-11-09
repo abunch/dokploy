@@ -13,7 +13,6 @@ import {
 	projects,
 	redis,
 } from "@dokploy/server/db/schema";
-import { hasValidLicense } from "@dokploy/server/services/proprietary/license-key";
 import { TRPCError } from "@trpc/server";
 import { and, eq } from "drizzle-orm";
 import {
@@ -55,11 +54,6 @@ const resolveRole = async (
 ): Promise<ReturnType<typeof ac.newRole> | null> => {
 	if (staticRoles[roleName]) {
 		return staticRoles[roleName];
-	}
-
-	const licensed = await hasValidLicense(organizationId);
-	if (!licensed) {
-		return null;
 	}
 
 	const customRoles = await db.query.organizationRole.findMany({

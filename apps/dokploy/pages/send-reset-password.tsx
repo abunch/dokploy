@@ -184,9 +184,6 @@ export async function getServerSideProps(context: GetServerSidePropsContext) {
 	}
 
 	const helpers = generateServerSideHelper(appRouter, context);
-	// Prefetch the public branding so the logo and app name render
-	// correctly on the server (no flash of default branding).
-	await helpers.whitelabeling.getPublic.prefetch();
 
 	return {
 		props: {
