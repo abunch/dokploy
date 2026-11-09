@@ -12,6 +12,7 @@ import {
 	getServicesByServerId,
 	haveActiveServices,
 	IS_CLOUD,
+	isPublicIpLookupDisabled,
 	redactServerSshKey,
 	removeDeploymentsByServerId,
 	removeServerVectorAgent,
@@ -150,7 +151,10 @@ export const serverRouter = createTRPCRouter({
 		.query(async ({ input }) => {
 			const server = await findServerById(input.serverId);
 			const isBuildServer = server.serverType === "build";
-			return defaultCommand(isBuildServer);
+			return defaultCommand(
+				isBuildServer,
+				isPublicIpLookupDisabled() ? server.ipAddress : undefined,
+			);
 		}),
 	getServices: withPermission("server", "read")
 		.input(apiFindOneServer)

@@ -35,6 +35,7 @@ export const DeployStep = ({ environmentId, onNext, plainTitle }: Props) => {
 		? "text-xl font-semibold tracking-tight"
 		: `${displayFont.className} text-4xl sm:text-5xl leading-[1.05] tracking-tight`;
 	const { data: isCloud = true } = api.settings.isCloud.useQuery();
+	const { data: templatesBaseUrl } = api.settings.templatesBaseUrl.useQuery();
 	const { data: servers } = api.server.withSSHKey.useQuery();
 	const serverId = servers?.[0]?.serverId;
 
@@ -280,7 +281,7 @@ export const DeployStep = ({ environmentId, onNext, plainTitle }: Props) => {
 								className="justify-start"
 							>
 								<img
-									src={`https://templates.dokploy.com/blueprints/${template.id}/${template.logo}`}
+									src={`${templatesBaseUrl}/blueprints/${template.id}/${template.logo}`}
 									alt={template.name}
 									className="size-4 object-contain shrink-0"
 								/>
