@@ -32,10 +32,6 @@ vi.mock("@/server/queues/queueSetup", () => ({
 	myQueue: { add: mocks.queueAdd },
 }));
 
-vi.mock("@/server/utils/deploy", () => ({
-	deploy: vi.fn(),
-}));
-
 import handler from "@/pages/api/deploy/[refreshToken]";
 
 const API = "https://api.bitbucket.org/2.0/repositories/acme/web";

@@ -1,7 +1,6 @@
 import {
 	createVolumeBackup,
 	findVolumeBackupById,
-	IS_CLOUD,
 	removeVolumeBackup,
 	removeVolumeBackupJob,
 	restoreVolume,
@@ -32,8 +31,6 @@ import { observable } from "@trpc/server/observable";
 import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { audit } from "@/server/api/utils/audit";
-import { assertVolumeBackupLimit } from "@/server/api/utils/plan-limits";
-import { removeJob, schedule, updateJob } from "@/server/utils/backup";
 import { createTRPCRouter, protectedProcedure, withPermission } from "../trpc";
 
 export const volumeBackupsRouter = createTRPCRouter({
@@ -107,27 +104,10 @@ export const volumeBackupsRouter = createTRPCRouter({
 				input.destinationId,
 				ctx.session.activeOrganizationId,
 			);
-			if (IS_CLOUD && serviceType && serviceId) {
-				const existingVolumeBackups = await db.query.volumeBackups.findMany({
-					where: eq(volumeBackups[`${serviceType}Id`], serviceId),
-				});
-				await assertVolumeBackupLimit(
-					ctx.session.activeOrganizationId,
-					existingVolumeBackups.length,
-				);
-			}
 			const newVolumeBackup = await createVolumeBackup(input);
 
 			if (newVolumeBackup?.enabled) {
-				if (IS_CLOUD) {
-					await schedule({
-						cronSchedule: newVolumeBackup.cronExpression,
-						volumeBackupId: newVolumeBackup.volumeBackupId,
-						type: "volume-backup",
-					});
-				} else {
-					await scheduleVolumeBackup(newVolumeBackup.volumeBackupId);
-				}
+				await scheduleVolumeBackup(newVolumeBackup.volumeBackupId);
 			}
 			await audit(ctx, {
 				action: "create",
@@ -224,28 +204,13 @@ export const volumeBackupsRouter = createTRPCRouter({
 				});
 			}
 
-			if (IS_CLOUD) {
-				if (updatedVolumeBackup.enabled) {
-					await updateJob({
-						cronSchedule: updatedVolumeBackup.cronExpression,
-						volumeBackupId: updatedVolumeBackup.volumeBackupId,
-						type: "volume-backup",
-					});
-				} else {
-					await removeJob({
-						cronSchedule: updatedVolumeBackup.cronExpression,
-						volumeBackupId: updatedVolumeBackup.volumeBackupId,
-						type: "volume-backup",
-					});
-				}
+			if (updatedVolumeBackup?.enabled) {
+				removeVolumeBackupJob(updatedVolumeBackup.volumeBackupId);
+				scheduleVolumeBackup(updatedVolumeBackup.volumeBackupId);
 			} else {
-				if (updatedVolumeBackup?.enabled) {
-					removeVolumeBackupJob(updatedVolumeBackup.volumeBackupId);
-					scheduleVolumeBackup(updatedVolumeBackup.volumeBackupId);
-				} else {
-					removeVolumeBackupJob(updatedVolumeBackup.volumeBackupId);
-				}
+				removeVolumeBackupJob(updatedVolumeBackup.volumeBackupId);
 			}
+
 			await audit(ctx, {
 				action: "update",
 				resourceType: "volumeBackup",

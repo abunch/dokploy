@@ -66,7 +66,6 @@ import {
 	projects,
 	redis,
 } from "@/server/db/schema";
-import { getBillingStatus } from "@/server/utils/billing";
 
 export const projectRouter = createTRPCRouter({
 	create: protectedProcedure
@@ -663,20 +662,14 @@ export const projectRouter = createTRPCRouter({
 			.where(eq(projects.organizationId, ctx.session.activeOrganizationId));
 		const projectCount = projectCountRows[0]?.projectCount ?? 0;
 
-		const billingStatus = await getBillingStatus(ctx.user.ownerId);
 		const currentUser = await findUserById(ctx.user.id);
 
 		const isOwner = ctx.user.role === "owner";
-		const billingGatePassed = IS_CLOUD ? !billingStatus.hasActiveAccess : true;
 
 		return {
 			shouldShowOnboarding:
-				isOwner &&
-				!currentUser.onboardingCompletedAt &&
-				projectCount === 0 &&
-				billingGatePassed,
+				isOwner && !currentUser.onboardingCompletedAt && projectCount === 0,
 			projectCount,
-			...billingStatus,
 		};
 	}),
 

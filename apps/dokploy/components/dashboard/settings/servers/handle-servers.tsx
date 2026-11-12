@@ -1,6 +1,5 @@
 import { standardSchemaResolver as zodResolver } from "@hookform/resolvers/standard-schema";
 import { PlusIcon } from "lucide-react";
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -67,8 +66,6 @@ interface Props {
 export const HandleServers = ({ serverId, children }: Props) => {
 	const utils = api.useUtils();
 	const [isOpen, setIsOpen] = useState(false);
-	const { data: canCreateMoreServers, refetch } =
-		api.stripe.canCreateMoreServers.useQuery();
 
 	const { data, refetch: refetchServer } = api.server.one.useQuery(
 		{
@@ -109,10 +106,6 @@ export const HandleServers = ({ serverId, children }: Props) => {
 			enableDockerCleanup: data?.enableDockerCleanup ?? true,
 		});
 	}, [form, form.reset, form.formState.isSubmitSuccessful, data]);
-
-	useEffect(() => {
-		refetch();
-	}, [isOpen]);
 
 	const onSubmit = async (data: Schema) => {
 		await mutateAsync({
@@ -233,14 +226,6 @@ export const HandleServers = ({ serverId, children }: Props) => {
 						of the above, to avoid issues.
 					</AlertBlock>
 				</div>
-				{!canCreateMoreServers && (
-					<AlertBlock type="warning" className="mt-4">
-						You cannot create more servers,{" "}
-						<Link href="/dashboard/settings/billing" className="text-primary">
-							Please upgrade your plan
-						</Link>
-					</AlertBlock>
-				)}
 				{isError && <AlertBlock type="error">{error?.message}</AlertBlock>}
 				<Form {...form}>
 					<form
@@ -447,7 +432,6 @@ export const HandleServers = ({ serverId, children }: Props) => {
 					<DialogFooter>
 						<Button
 							isLoading={isPending}
-							disabled={!canCreateMoreServers && !serverId}
 							form="hook-form-add-server"
 							type="submit"
 						>

@@ -31,7 +31,6 @@ import {
 	startCompose,
 	stopCompose,
 	updateCompose,
-	updateDeploymentStatus,
 } from "@dokploy/server";
 import { paths } from "@dokploy/server/constants";
 import { db } from "@dokploy/server/db";
@@ -77,7 +76,6 @@ import {
 	killDockerBuild,
 	myQueue,
 } from "@/server/queues/queueSetup";
-import { cancelDeployment, deploy } from "@/server/utils/deploy";
 import { generatePassword } from "@/templates/utils";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { audit } from "../utils/audit";
@@ -431,18 +429,6 @@ export const composeRouter = createTRPCRouter({
 				freshVolumes: input.freshVolumes,
 			};
 
-			if (IS_CLOUD && compose.serverId) {
-				deploy(jobData).catch((error) => {
-					console.error("Background deployment failed:", error);
-				});
-				await audit(ctx, {
-					action: "deploy",
-					resourceType: "compose",
-					resourceId: input.composeId,
-					resourceName: compose.name,
-				});
-				return true;
-			}
 			await myQueue.add(
 				"deployments",
 				{ ...jobData },
@@ -480,18 +466,6 @@ export const composeRouter = createTRPCRouter({
 				serverId: compose.serverId ?? undefined,
 				freshVolumes: input.freshVolumes,
 			};
-			if (IS_CLOUD && compose.serverId) {
-				deploy(jobData).catch((error) => {
-					console.error("Background deployment failed:", error);
-				});
-				await audit(ctx, {
-					action: "deploy",
-					resourceType: "compose",
-					resourceId: input.composeId,
-					resourceName: compose.name,
-				});
-				return true;
-			}
 			await myQueue.add(
 				"deployments",
 				{ ...jobData },
@@ -1062,45 +1036,6 @@ export const composeRouter = createTRPCRouter({
 				deployment: ["cancel"],
 			});
 			const compose = await findComposeById(input.composeId);
-
-			if (IS_CLOUD && compose.serverId) {
-				try {
-					await updateCompose(input.composeId, {
-						composeStatus: "idle",
-					});
-
-					if (compose.deployments[0]) {
-						await updateDeploymentStatus(
-							compose.deployments[0].deploymentId,
-							"done",
-						);
-					}
-
-					await cancelDeployment({
-						composeId: input.composeId,
-						applicationType: "compose",
-					});
-
-					await audit(ctx, {
-						action: "stop",
-						resourceType: "compose",
-						resourceId: input.composeId,
-						resourceName: compose.name,
-					});
-					return {
-						success: true,
-						message: "Deployment cancellation requested",
-					};
-				} catch (error) {
-					throw new TRPCError({
-						code: "INTERNAL_SERVER_ERROR",
-						message:
-							error instanceof Error
-								? error.message
-								: "Failed to cancel deployment",
-					});
-				}
-			}
 
 			throw new TRPCError({
 				code: "BAD_REQUEST",

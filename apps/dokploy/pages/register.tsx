@@ -22,7 +22,6 @@ import {
 	FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { pushToDataLayer } from "@/lib/analytics";
 import { authClient } from "@/lib/auth-client";
 import { appRouter } from "@/server/api/root";
 import { generateServerSideHelper } from "@/utils/create-server-helpers";
@@ -118,7 +117,6 @@ const Register = ({ isCloud }: Props) => {
 			if (!isCloud) {
 				router.push("/");
 			} else {
-				pushToDataLayer("sign_up", { method: "email" });
 				setData(data);
 			}
 		}

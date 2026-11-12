@@ -18,14 +18,12 @@ import { api } from "@/utils/api";
 import { getOnboardingState, setOnboardingState } from "./onboarding-lock";
 import { CompleteStep } from "./steps/complete-step";
 import { DeployStep } from "./steps/deploy-step";
-import { PlanStep } from "./steps/plan-step";
 import { ProjectStep } from "./steps/project-step";
 import { ServerStep } from "./steps/server-step";
 import { WelcomeStep } from "./steps/welcome-step";
 
 const { useStepper, steps, Scoped } = defineStepper(
 	{ id: "welcome", title: "Welcome" },
-	{ id: "plan", title: "Pick a plan" },
 	{ id: "project", title: "New project" },
 	{ id: "server", title: "Connect server" },
 	{ id: "deploy", title: "Ship something" },
@@ -56,9 +54,7 @@ export const OnboardingWizard = ({ onClose }: Props) => {
 	const { data: isCloud = true } = api.settings.isCloud.useQuery();
 	const visibleStepIds = isCloud
 		? steps.map((step) => step.id)
-		: steps
-				.filter((step) => step.id !== "plan" && step.id !== "server")
-				.map((step) => step.id);
+		: steps.filter((step) => step.id !== "server").map((step) => step.id);
 	const visibleIndex = visibleStepIds.indexOf(stepper.current.id);
 	const isLastVisible = visibleIndex === visibleStepIds.length - 1;
 	const goToNextVisible = () => {
@@ -239,7 +235,6 @@ export const OnboardingWizard = ({ onClose }: Props) => {
 					<div className="mx-auto w-full max-w-2xl px-6 py-14 lg:py-20">
 						{stepper.switch({
 							welcome: () => <WelcomeStep onNext={goToNextVisible} />,
-							plan: () => <PlanStep onNext={goToNextVisible} />,
 							project: () => (
 								<ProjectStep
 									onNext={(project) => {

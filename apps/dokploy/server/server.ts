@@ -16,6 +16,7 @@ import {
 import { config } from "dotenv";
 import next from "next";
 import packageInfo from "../package.json";
+import { buildContentSecurityPolicy } from "./utils/csp";
 import { setupDockerContainerLogsWebSocketServer } from "./wss/docker-container-logs";
 import { setupDockerContainerTerminalWebSocketServer } from "./wss/docker-container-terminal";
 import { setupDockerStatsMonitoringSocketServer } from "./wss/docker-stats";
@@ -42,7 +43,12 @@ const handle = app.getRequestHandler();
 void app.prepare().then(async () => {
 	try {
 		console.log("Running DokployVersion: ", packageInfo.version);
+		const contentSecurityPolicy = buildContentSecurityPolicy({
+			dev,
+			templatesUrl: process.env.TEMPLATES_URL,
+		});
 		const server = http.createServer((req, res) => {
+			res.setHeader("Content-Security-Policy", contentSecurityPolicy);
 			handle(req, res);
 		});
 

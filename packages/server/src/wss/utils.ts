@@ -1,7 +1,6 @@
 import os from "node:os";
 import path from "node:path";
 import { paths } from "@dokploy/server/constants";
-import { publicIpv4, publicIpv6 } from "public-ip";
 
 export const getShell = () => {
 	switch (os.platform()) {
@@ -12,33 +11,6 @@ export const getShell = () => {
 		default:
 			return "bash";
 	}
-};
-
-export const isPublicIpLookupDisabled = () =>
-	process.env.DISABLE_PUBLIC_IP_LOOKUP === "true";
-
-export const getPublicIpWithFallback = async () => {
-	if (isPublicIpLookupDisabled()) {
-		return null;
-	}
-	let ip: string | null = null;
-	try {
-		ip = await publicIpv4();
-	} catch (error) {
-		console.log(
-			"Error obtaining public IPv4 address, falling back to IPv6",
-			// @ts-expect-error
-			error.message,
-		);
-		try {
-			ip = await publicIpv6();
-		} catch (error) {
-			// @ts-expect-error
-			console.error("Error obtaining public IPv6 address", error.message);
-			ip = null;
-		}
-	}
-	return ip;
 };
 
 export const readValidDirectory = (

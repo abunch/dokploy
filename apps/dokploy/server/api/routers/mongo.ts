@@ -16,6 +16,7 @@ import {
 	IS_CLOUD,
 	rebuildDatabase,
 	removeMongoById,
+	removeScheduleBackup,
 	removeService,
 	startService,
 	startServiceRemote,
@@ -51,7 +52,6 @@ import {
 	mongo as mongoTable,
 	projects,
 } from "@/server/db/schema";
-import { cancelJobs } from "@/server/utils/backup";
 export const mongoRouter = createTRPCRouter({
 	create: protectedProcedure
 		.input(apiCreateMongo)
@@ -351,7 +351,13 @@ export const mongoRouter = createTRPCRouter({
 
 			const cleanupOperations = [
 				async () => await removeService(mongo?.appName, mongo.serverId),
-				async () => await cancelJobs(backups),
+				async () => {
+					for (const backup of backups) {
+						if (backup.enabled) {
+							removeScheduleBackup(backup.backupId);
+						}
+					}
+				},
 				async () => await removeMongoById(input.mongoId),
 			];
 

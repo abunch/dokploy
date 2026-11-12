@@ -5,7 +5,6 @@ import {
 	findGithubById,
 	findPreviewDeploymentByApplicationId,
 	findPreviewDeploymentsByPullRequestId,
-	IS_CLOUD,
 	removePreviewDeployment,
 	shouldDeploy,
 } from "@dokploy/server";
@@ -16,7 +15,6 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { applications, compose, github } from "@/server/db/schema";
 import type { DeploymentJob } from "@/server/queues/queue-types";
 import { myQueue } from "@/server/queues/queueSetup";
-import { deploy } from "@/server/utils/deploy";
 import {
 	extractCommitMessage,
 	extractHash,
@@ -147,12 +145,6 @@ export default async function handler(
 					serverId: app.serverId ?? undefined,
 				};
 
-				if (IS_CLOUD && app.serverId) {
-					deploy(jobData).catch((error) => {
-						console.error("Background deployment failed:", error);
-					});
-					continue;
-				}
 				await myQueue.add(
 					"deployments",
 					{ ...jobData },
@@ -185,13 +177,6 @@ export default async function handler(
 					server: !!composeApp.serverId,
 					serverId: composeApp.serverId ?? undefined,
 				};
-
-				if (IS_CLOUD && composeApp.serverId) {
-					deploy(jobData).catch((error) => {
-						console.error("Background deployment failed:", error);
-					});
-					continue;
-				}
 
 				await myQueue.add(
 					"deployments",
@@ -269,12 +254,6 @@ export default async function handler(
 					continue;
 				}
 
-				if (IS_CLOUD && app.serverId) {
-					deploy(jobData).catch((error) => {
-						console.error("Background deployment failed:", error);
-					});
-					continue;
-				}
 				await myQueue.add(
 					"deployments",
 					{ ...jobData },
@@ -314,12 +293,6 @@ export default async function handler(
 				);
 
 				if (!shouldDeployPaths) {
-					continue;
-				}
-				if (IS_CLOUD && composeApp.serverId) {
-					deploy(jobData).catch((error) => {
-						console.error("Background deployment failed:", error);
-					});
 					continue;
 				}
 
@@ -531,12 +504,6 @@ export default async function handler(
 				};
 
 				if (previewDeploymentId) {
-					if (IS_CLOUD && app.serverId) {
-						deploy(jobData).catch((error) => {
-							console.error("Background deployment failed:", error);
-						});
-						continue;
-					}
 					await myQueue.add(
 						"deployments",
 						{ ...jobData },

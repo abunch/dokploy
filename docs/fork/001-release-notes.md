@@ -26,6 +26,9 @@
 
 ## Isolated networks
 
+Superseded by 009: these switches were removed and the behaviour is now always off. See
+`docs/fork/009-release-notes.md`.
+
 | Variable | Effect |
 |---|---|
 | `DISABLE_UPDATE_CHECK=true` | No Docker Hub tag lookup |

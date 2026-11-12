@@ -90,10 +90,6 @@ vi.mock("@/server/queues/queueSetup", () => ({
 	},
 }));
 
-vi.mock("@/server/utils/deploy", () => ({
-	deploy: vi.fn(),
-}));
-
 import handler from "@/pages/api/deploy/github";
 
 const getConditionValue = (

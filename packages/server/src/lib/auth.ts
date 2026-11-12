@@ -29,13 +29,10 @@ import {
 	getWebServerSettings,
 	updateWebServerSettings,
 } from "../services/web-server-settings";
-import { getHubSpotUTK, submitToHubSpot } from "../utils/tracking/hubspot";
-import { captureEvent, getPostHogSessionId } from "../utils/tracking/posthog";
 import {
 	sendEmail,
 	sendVerificationEmail,
 } from "../verification/send-verification-email";
-import { getPublicIpWithFallback } from "../wss/utils";
 import { ac, adminRole, memberRole, ownerRole } from "./access-control";
 import { betterAuthSecret } from "./auth-secret";
 
@@ -52,12 +49,7 @@ const resolveTrustedOrigins = async () => {
 		if (!settings) return [];
 
 		const devOrigins =
-			process.env.NODE_ENV === "development"
-				? [
-						"http://localhost:3000",
-						"https://absolutely-handy-falcon.ngrok-free.app",
-					]
-				: [];
+			process.env.NODE_ENV === "development" ? ["http://localhost:3000"] : [];
 		return [
 			...(settings?.serverIp ? [`http://${settings?.serverIp}:3000`] : []),
 			...(settings?.host ? [`https://${settings?.host}`] : []),
@@ -262,33 +254,8 @@ const createBetterAuth = () =>
 
 						if (!IS_CLOUD && !isAdminPresent) {
 							await updateWebServerSettings({
-								serverIp: await getPublicIpWithFallback(),
+								serverIp: process.env.SERVER_IP || null,
 							});
-						}
-
-						if (IS_CLOUD) {
-							try {
-								const hutk = getHubSpotUTK(
-									context?.request?.headers?.get("cookie") || undefined,
-								);
-								// Cast to include additional fields
-								const userWithFields = user as typeof user & {
-									lastName?: string;
-								};
-								const hubspotSuccess = await submitToHubSpot(
-									{
-										email: user.email,
-										firstName: user.name || "", // name is mapped to firstName column
-										lastName: userWithFields.lastName || "",
-									},
-									hutk,
-								);
-								if (!hubspotSuccess) {
-									console.error("Failed to submit to HubSpot");
-								}
-							} catch (error) {
-								console.error("Error submitting to HubSpot", error);
-							}
 						}
 
 						if (isSCIMRequest) {
@@ -331,20 +298,6 @@ const createBetterAuth = () =>
 
 								return organization;
 							});
-
-							if (IS_CLOUD) {
-								void captureEvent({
-									distinctId: user.id,
-									event: "user_signed_up",
-									organizationId: createdOrganization?.id,
-									sessionId: getPostHogSessionId(context?.request?.headers),
-									properties: {
-										method: context?.path,
-										$set: { email: user.email, name: user.name },
-										$set_once: { signed_up_at: new Date().toISOString() },
-									},
-								});
-							}
 						} else if (isSSORequest) {
 							const providerId = context?.params?.providerId;
 							if (!providerId) {

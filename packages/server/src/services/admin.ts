@@ -105,9 +105,6 @@ export const removeUserById = async (userId: string) => {
 };
 
 export const getDokployUrl = async () => {
-	if (IS_CLOUD) {
-		return "https://app.dokploy.com";
-	}
 	const settings = await getWebServerSettings();
 
 	if (settings?.host) {

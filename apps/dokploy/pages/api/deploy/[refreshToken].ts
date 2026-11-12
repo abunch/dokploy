@@ -1,7 +1,6 @@
 import {
 	type Bitbucket,
 	getBitbucketHeaders,
-	IS_CLOUD,
 	shouldDeploy,
 } from "@dokploy/server";
 import { db } from "@dokploy/server/db";
@@ -10,7 +9,6 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { applications } from "@/server/db/schema";
 import type { DeploymentJob } from "@/server/queues/queue-types";
 import { myQueue } from "@/server/queues/queueSetup";
-import { deploy } from "@/server/utils/deploy";
 
 /**
  * Log a webhook handler error server-side without leaking its shape to the HTTP
@@ -284,20 +282,14 @@ export default async function handler(
 				serverId: application.serverId ?? undefined,
 			};
 
-			if (IS_CLOUD && application.serverId) {
-				deploy(jobData).catch((error) => {
-					console.error("Background deployment failed:", error);
-				});
-			} else {
-				await myQueue.add(
-					"deployments",
-					{ ...jobData },
-					{
-						removeOnComplete: true,
-						removeOnFail: true,
-					},
-				);
-			}
+			await myQueue.add(
+				"deployments",
+				{ ...jobData },
+				{
+					removeOnComplete: true,
+					removeOnFail: true,
+				},
+			);
 		} catch (error) {
 			logWebhookError("Error deploying Application:", error);
 			res.status(400).json({ message: "Error deploying Application" });

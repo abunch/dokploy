@@ -8,7 +8,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
 	execAsyncRemote: vi.fn(),
 	findServerById: vi.fn(),
-	getPublicIpWithFallback: vi.fn(),
 	getWebServerSettings: vi.fn(),
 	resolve4: vi.fn(),
 	resolve6: vi.fn(),
@@ -31,11 +30,6 @@ vi.mock("@dokploy/server/services/server", () => ({
 
 vi.mock("@dokploy/server/services/web-server-settings", () => ({
 	getWebServerSettings: mocks.getWebServerSettings,
-}));
-
-vi.mock("@dokploy/server/wss/utils", () => ({
-	getPublicIpWithFallback: mocks.getPublicIpWithFallback,
-	isPublicIpLookupDisabled: () => false,
 }));
 
 describe("getServerIpCandidates", () => {
@@ -72,7 +66,6 @@ describe("getServerIpCandidates", () => {
 		mocks.getWebServerSettings.mockResolvedValue({
 			serverIp: "10.0.0.10",
 		});
-		mocks.getPublicIpWithFallback.mockResolvedValue("2001:db8::10");
 		vi.spyOn(os, "networkInterfaces").mockReturnValue({
 			eth0: [
 				{
@@ -89,34 +82,25 @@ describe("getServerIpCandidates", () => {
 		await expect(getServerIpCandidates()).resolves.toEqual([
 			"10.0.0.10",
 			"192.0.2.10",
-			"2001:db8::10",
 		]);
 	});
 
-	it("retains remote interface addresses when public IP detection times out", async () => {
-		vi.useFakeTimers();
+	it("never asks an outside service for a remote server's address", async () => {
 		mocks.findServerById.mockResolvedValue({
 			ipAddress: "10.0.0.10",
 		});
-		mocks.execAsyncRemote.mockImplementation(
-			(_serverId: string, command: string) => {
-				if (command.includes("curl")) {
-					return new Promise(() => undefined);
-				}
-				return Promise.resolve({
-					stdout: "192.0.2.10\n",
-					stderr: "",
-				});
-			},
-		);
+		mocks.execAsyncRemote.mockResolvedValue({
+			stdout: "192.0.2.10\n",
+			stderr: "",
+		});
 
-		const candidatesPromise = getServerIpCandidates("server-id");
-		await vi.advanceTimersByTimeAsync(7000);
-
-		await expect(candidatesPromise).resolves.toEqual([
+		await expect(getServerIpCandidates("server-id")).resolves.toEqual([
 			"10.0.0.10",
 			"192.0.2.10",
 		]);
+		for (const [, command] of mocks.execAsyncRemote.mock.calls) {
+			expect(command).not.toMatch(/curl|ifconfig|icanhazip/);
+		}
 	});
 });
 

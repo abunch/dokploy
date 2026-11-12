@@ -2,7 +2,6 @@ import {
 	findApplicationById,
 	findPreviewDeploymentById,
 	findPreviewDeploymentsByApplicationId,
-	IS_CLOUD,
 	removePreviewDeployment,
 } from "@dokploy/server";
 import { checkServicePermissionAndAccess } from "@dokploy/server/services/permission";
@@ -11,7 +10,6 @@ import { audit } from "@/server/api/utils/audit";
 import { apiFindAllByApplication } from "@/server/db/schema";
 import type { DeploymentJob } from "@/server/queues/queue-types";
 import { myQueue } from "@/server/queues/queueSetup";
-import { deploy } from "@/server/utils/deploy";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 export const previewDeploymentRouter = createTRPCRouter({
@@ -89,17 +87,6 @@ export const previewDeploymentRouter = createTRPCRouter({
 				serverId: application.serverId ?? undefined,
 			};
 
-			if (IS_CLOUD && application.serverId) {
-				deploy(jobData).catch((error) => {
-					console.error("Background deployment failed:", error);
-				});
-				await audit(ctx, {
-					action: "redeploy",
-					resourceType: "previewDeployment",
-					resourceId: input.previewDeploymentId,
-				});
-				return true;
-			}
 			await myQueue.add(
 				"deployments",
 				{ ...jobData },

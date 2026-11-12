@@ -17,6 +17,7 @@ import {
 	IS_CLOUD,
 	rebuildDatabase,
 	removePostgresById,
+	removeScheduleBackup,
 	removeService,
 	startService,
 	startServiceRemote,
@@ -52,7 +53,6 @@ import {
 	postgres as postgresTable,
 	projects,
 } from "@/server/db/schema";
-import { cancelJobs } from "@/server/utils/backup";
 
 export const postgresRouter = createTRPCRouter({
 	create: protectedProcedure
@@ -324,7 +324,13 @@ export const postgresRouter = createTRPCRouter({
 
 			const cleanupOperations = [
 				async () => await removeService(postgres?.appName, postgres.serverId),
-				async () => await cancelJobs(backups),
+				async () => {
+					for (const backup of backups) {
+						if (backup.enabled) {
+							removeScheduleBackup(backup.backupId);
+						}
+					}
+				},
 				async () => await removePostgresById(input.postgresId),
 			];
 

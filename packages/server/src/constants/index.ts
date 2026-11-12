@@ -2,7 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import Docker from "dockerode";
 
-export const IS_CLOUD = process.env.IS_CLOUD === "true";
+// Hosted-service mode is permanently off in this fork: it only exists to reach vendor services.
+export const IS_CLOUD = false as boolean;
 
 export const DOKPLOY_DOCKER_API_VERSION =
 	process.env.DOKPLOY_DOCKER_API_VERSION;

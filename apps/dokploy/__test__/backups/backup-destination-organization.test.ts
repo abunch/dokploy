@@ -60,12 +60,6 @@ vi.mock("@/server/api/utils/plan-limits", () => ({
 	assertDatabaseBackupLimit: vi.fn(),
 }));
 
-vi.mock("@/server/utils/backup", () => ({
-	removeJob: vi.fn(),
-	schedule: vi.fn(),
-	updateJob: vi.fn(),
-}));
-
 const { backupRouter } = await import("@/server/api/routers/backup");
 
 const caller = backupRouter.createCaller({

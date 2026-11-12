@@ -49,12 +49,6 @@ vi.mock("@/server/api/utils/plan-limits", () => ({
 	assertVolumeBackupLimit: vi.fn(),
 }));
 
-vi.mock("@/server/utils/backup", () => ({
-	removeJob: vi.fn(),
-	schedule: vi.fn(),
-	updateJob: vi.fn(),
-}));
-
 const { volumeBackupsRouter } = await import(
 	"@/server/api/routers/volume-backups"
 );

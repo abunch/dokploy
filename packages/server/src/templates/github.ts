@@ -50,9 +50,8 @@ interface TemplateMetadata {
 	tags: string[];
 }
 
-// An empty TEMPLATES_URL disables the catalog for networks that must not reach the default host.
-export const getTemplatesBaseUrl = () =>
-	process.env.TEMPLATES_URL ?? "https://templates.dokploy.com";
+// No built-in catalog: templates load only from a catalog the operator hosts and configures.
+export const getTemplatesBaseUrl = () => process.env.TEMPLATES_URL || "";
 
 /**
  * Fetches the list of available templates from meta.json
@@ -61,9 +60,7 @@ export async function fetchTemplatesList(
 	baseUrl = getTemplatesBaseUrl(),
 ): Promise<TemplateMetadata[]> {
 	if (!baseUrl) {
-		throw new Error(
-			"The template catalog is disabled (TEMPLATES_URL is empty)",
-		);
+		throw new Error("No template catalog is configured (set TEMPLATES_URL)");
 	}
 	const response = await fetch(`${baseUrl}/meta.json`, {
 		signal: AbortSignal.timeout(10000),
@@ -134,9 +131,7 @@ export async function fetchTemplateFiles(
 	baseUrl = getTemplatesBaseUrl(),
 ): Promise<{ config: CompleteTemplate; dockerCompose: string }> {
 	if (!baseUrl) {
-		throw new Error(
-			"The template catalog is disabled (TEMPLATES_URL is empty)",
-		);
+		throw new Error("No template catalog is configured (set TEMPLATES_URL)");
 	}
 	const timeout = AbortSignal.timeout(10000);
 	const [templateYmlResponse, dockerComposeResponse] = await Promise.all([

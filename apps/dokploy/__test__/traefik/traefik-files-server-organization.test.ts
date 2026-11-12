@@ -34,11 +34,6 @@ vi.mock("@/server/queues/queueSetup", () => ({
 	cleanAllDeploymentQueue: vi.fn(),
 }));
 
-vi.mock("@/server/utils/backup", () => ({
-	removeJob: vi.fn(),
-	schedule: vi.fn(),
-}));
-
 const { settingsRouter } = await import("@/server/api/routers/settings");
 
 const caller = settingsRouter.createCaller({

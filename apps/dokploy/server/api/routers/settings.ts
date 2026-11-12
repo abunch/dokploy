@@ -12,21 +12,16 @@ import {
 	cleanupImages,
 	cleanupSystem,
 	cleanupVolumes,
-	DEFAULT_UPDATE_DATA,
 	findServerById,
 	getDockerDiskUsage,
-	getDockerResourceType,
 	getDokployImageTag,
 	getLogCleanupStatus,
-	getPostHogKey,
 	getTraefikOverview,
-	getUpdateData,
 	getWebServerSettings,
 	IS_CLOUD,
 	isPanelPortPublished,
 	isRequestFromPanelHost,
 	PANEL_PORT_RECOVERY_COMMAND,
-	POSTHOG_HOST,
 	parseRawConfig,
 	paths,
 	prepareEnvironmentVariables,
@@ -44,7 +39,6 @@ import {
 	reloadDockerResource,
 	sendDockerCleanupNotifications,
 	setupGPUSupport,
-	spawnAsync,
 	startLogCleanup,
 	stopLogCleanup,
 	togglePanelPort,
@@ -82,7 +76,6 @@ import {
 	server,
 } from "@/server/db/schema";
 import { cleanAllDeploymentQueue } from "@/server/queues/queueSetup";
-import { removeJob, schedule } from "@/server/utils/backup";
 import packageInfo from "../../../package.json";
 import { appRouter } from "../root";
 import {
@@ -148,7 +141,7 @@ export const settingsRouter = createTRPCRouter({
 		if (IS_CLOUD) {
 			return true;
 		}
-		await reloadDockerResource("dokploy", undefined, packageInfo.version);
+		await reloadDockerResource("dokploy");
 		await audit(ctx, {
 			action: "reload",
 			resourceType: "settings",
@@ -416,34 +409,18 @@ export const settingsRouter = createTRPCRouter({
 							message: "Server is inactive",
 						});
 					}
-					if (IS_CLOUD) {
-						await schedule({
-							cronSchedule: CLEANUP_CRON_JOB,
-							serverId: input.serverId,
-							type: "server",
-						});
-					} else {
-						scheduleJob(server.serverId, CLEANUP_CRON_JOB, async () => {
-							console.log(
-								`Docker Cleanup ${new Date().toLocaleString()}] Running...`,
-							);
+					scheduleJob(server.serverId, CLEANUP_CRON_JOB, async () => {
+						console.log(
+							`Docker Cleanup ${new Date().toLocaleString()}] Running...`,
+						);
 
-							await cleanupAll(server.serverId);
+						await cleanupAll(server.serverId);
 
-							await sendDockerCleanupNotifications(server.organizationId);
-						});
-					}
+						await sendDockerCleanupNotifications(server.organizationId);
+					});
 				} else {
-					if (IS_CLOUD) {
-						await removeJob({
-							cronSchedule: CLEANUP_CRON_JOB,
-							serverId: input.serverId,
-							type: "server",
-						});
-					} else {
-						const currentJob = scheduledJobs[server.serverId];
-						currentJob?.cancel();
-					}
+					const currentJob = scheduledJobs[server.serverId];
+					currentJob?.cancel();
 				}
 			} else if (!IS_CLOUD) {
 				const settingsUpdated = await updateWebServerSettings({
@@ -609,47 +586,6 @@ export const settingsRouter = createTRPCRouter({
 			});
 			return true;
 		}),
-	getUpdateData: protectedProcedure.mutation(async () => {
-		if (IS_CLOUD) {
-			return DEFAULT_UPDATE_DATA;
-		}
-
-		return await getUpdateData(packageInfo.version);
-	}),
-	updateServer: adminProcedure.mutation(async ({ ctx }) => {
-		if (IS_CLOUD) {
-			return true;
-		}
-
-		const resourceType = await getDockerResourceType("dokploy");
-		if (resourceType !== "service") {
-			throw new TRPCError({
-				code: "BAD_REQUEST",
-				message:
-					"Dokploy is not running as a Docker service, so in-panel updates are unavailable here. Update manually instead.",
-			});
-		}
-
-		const data = await getUpdateData(packageInfo.version);
-		if (data.updateAvailable) {
-			void spawnAsync("docker", [
-				"service",
-				"update",
-				"--force",
-				"--image",
-				`dokploy/dokploy:${data.latestVersion}`,
-				"dokploy",
-			]);
-			await audit(ctx, {
-				action: "update",
-				resourceType: "settings",
-				resourceName: "dokploy-version",
-			});
-		}
-
-		return true;
-	}),
-
 	getDokployVersion: protectedProcedure.query(() => {
 		return packageInfo.version;
 	}),
@@ -1028,10 +964,6 @@ export const settingsRouter = createTRPCRouter({
 		return IS_CLOUD;
 	}),
 	templatesBaseUrl: publicProcedure.query(() => getTemplatesBaseUrl()),
-	getPostHogConfig: publicProcedure.query(() => {
-		const key = getPostHogKey();
-		return key ? { key, host: POSTHOG_HOST } : null;
-	}),
 	isUserSubscribed: protectedProcedure.query(async ({ ctx }) => {
 		const haveServers = await db.query.server.findMany({
 			where: eq(server.organizationId, ctx.session?.activeOrganizationId || ""),
