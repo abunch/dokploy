@@ -12,6 +12,7 @@ import {
 	getServicesByServerId,
 	haveActiveServices,
 	IS_CLOUD,
+	isPublicIpLookupDisabled,
 	redactServerSshKey,
 	removeDeploymentsByServerId,
 	removeServerVectorAgent,
@@ -26,7 +27,6 @@ import {
 	findMemberByUserId,
 	hasPermission,
 } from "@dokploy/server/services/permission";
-import { hasValidLicense } from "@dokploy/server/services/proprietary/license-key";
 import { TRPCError } from "@trpc/server";
 import { observable } from "@trpc/server/observable";
 import { and, desc, eq, getTableColumns, isNotNull, sql } from "drizzle-orm";
@@ -151,7 +151,10 @@ export const serverRouter = createTRPCRouter({
 		.query(async ({ input }) => {
 			const server = await findServerById(input.serverId);
 			const isBuildServer = server.serverType === "build";
-			return defaultCommand(isBuildServer);
+			return defaultCommand(
+				isBuildServer,
+				isPublicIpLookupDisabled() ? server.ipAddress : undefined,
+			);
 		}),
 	getServices: withPermission("server", "read")
 		.input(apiFindOneServer)
@@ -210,18 +213,8 @@ export const serverRouter = createTRPCRouter({
 
 		return result.filter((s) => accessibleIds.has(s.serverId));
 	}),
-	allForPermissions: withPermission("member", "update")
-		.use(async ({ ctx, next }) => {
-			const licensed = await hasValidLicense(ctx.session.activeOrganizationId);
-			if (!licensed) {
-				throw new TRPCError({
-					code: "FORBIDDEN",
-					message: "Valid enterprise license required",
-				});
-			}
-			return next();
-		})
-		.query(async ({ ctx }) => {
+	allForPermissions: withPermission("member", "update").query(
+		async ({ ctx }) => {
 			return await db.query.server.findMany({
 				columns: {
 					serverId: true,
@@ -232,7 +225,8 @@ export const serverRouter = createTRPCRouter({
 				orderBy: desc(server.createdAt),
 				where: eq(server.organizationId, ctx.session.activeOrganizationId),
 			});
-		}),
+		},
+	),
 	count: protectedProcedure.query(async ({ ctx }) => {
 		const organizations = await db.query.organization.findMany({
 			where: eq(organization.ownerId, ctx.user.id),

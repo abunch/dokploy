@@ -12,60 +12,43 @@ import {
 	DialogTitle,
 	DialogTrigger,
 } from "@/components/ui/dialog";
-import { Switch } from "@/components/ui/switch";
 import { api } from "@/utils/api";
 
 interface Props {
 	domainId: string;
+	host: string;
 	applicationId: string;
+	forwardAuthEnabled: boolean;
 }
 
-export const HandleForwardAuth = ({ domainId, applicationId }: Props) => {
+// SSO forward-auth can no longer be configured, but domains that already have it stay protected
+// until an admin turns it off here.
+export const HandleForwardAuth = ({
+	domainId,
+	host,
+	applicationId,
+	forwardAuthEnabled,
+}: Props) => {
 	const [isOpen, setIsOpen] = useState(false);
-
-	const { data: haveValidLicense } =
-		api.licenseKey.haveValidLicenseKey.useQuery();
-
 	const utils = api.useUtils();
+	const { mutateAsync, isPending } = api.domain.update.useMutation();
 
-	const { data: status } = api.forwardAuth.status.useQuery(
-		{ domainId },
-		{ enabled: isOpen },
-	);
-
-	const { mutateAsync: enable, isPending: isEnabling } =
-		api.forwardAuth.enable.useMutation();
-	const { mutateAsync: disable, isPending: isDisabling } =
-		api.forwardAuth.disable.useMutation();
-
-	if (!haveValidLicense) {
+	if (!forwardAuthEnabled) {
 		return null;
 	}
 
-	const isEnabled = !!status?.enabled;
-	const isPending = isEnabling || isDisabling;
-
-	const refresh = async () => {
-		await utils.forwardAuth.status.invalidate({ domainId });
-		await utils.domain.byApplicationId.invalidate({ applicationId });
-		await utils.application.readTraefikConfig.invalidate({ applicationId });
-	};
-
-	const handleToggle = async (next: boolean) => {
+	const handleDisable = async () => {
 		try {
-			if (next) {
-				await enable({ domainId });
-				toast.success("SSO authentication enabled for this domain");
-			} else {
-				await disable({ domainId });
-				toast.success("SSO authentication disabled for this domain");
-			}
-			await refresh();
+			await mutateAsync({ domainId, host, forwardAuthEnabled: false });
+			toast.success("SSO authentication disabled for this domain");
+			await utils.domain.byApplicationId.invalidate({ applicationId });
+			await utils.application.readTraefikConfig.invalidate({ applicationId });
+			setIsOpen(false);
 		} catch (error) {
 			toast.error(
 				error instanceof Error
 					? error.message
-					: "Error updating SSO authentication",
+					: "Error disabling SSO authentication",
 			);
 		}
 	};
@@ -79,66 +62,31 @@ export const HandleForwardAuth = ({ domainId, applicationId }: Props) => {
 					className="group hover:bg-emerald-500/10"
 					title="SSO authentication"
 				>
-					<ShieldCheck
-						className={`size-4 ${
-							isEnabled
-								? "text-emerald-500"
-								: "text-primary group-hover:text-emerald-500"
-						}`}
-					/>
+					<ShieldCheck className="size-4 text-emerald-500" />
 				</Button>
 			</DialogTrigger>
 			<DialogContent>
 				<DialogHeader>
 					<DialogTitle>SSO Authentication</DialogTitle>
 					<DialogDescription>
-						Require visitors to authenticate against your identity provider
-						before reaching this application.
+						This domain requires visitors to authenticate through the SSO
+						authentication proxy.
 					</DialogDescription>
 				</DialogHeader>
-
 				<AlertBlock type="warning">
-					<div className="flex flex-col gap-1">
-						<span className="font-medium">Requirements</span>
-						<ol className="list-decimal pl-4 text-sm">
-							<li>
-								The authentication proxy container must be deployed and running
-								on this app's server. Configure it under{" "}
-								<span className="font-medium">
-									Settings → SSO → Application Authentication
-								</span>
-								.
-							</li>
-							<li>
-								This domain must share the same base domain as the
-								authentication domain (e.g. <code>app.acme.com</code> and{" "}
-								<code>auth.acme.com</code>).
-							</li>
-						</ol>
-					</div>
+					SSO configuration is not available in this version. Disabling the
+					protection makes the domain publicly accessible.
 				</AlertBlock>
-
-				<div className="flex items-center justify-between rounded-lg border p-4 mt-2">
-					<div className="flex flex-col">
-						<span className="text-sm font-medium">
-							Protect this domain with SSO
-						</span>
-						<span className="text-xs text-muted-foreground">
-							{isEnabled
-								? "Visitors must log in via your identity provider."
-								: "The domain is publicly accessible."}
-						</span>
-					</div>
-					<Switch
-						checked={isEnabled}
-						disabled={isPending}
-						onCheckedChange={handleToggle}
-					/>
-				</div>
-
 				<DialogFooter>
 					<Button variant="outline" onClick={() => setIsOpen(false)}>
 						Close
+					</Button>
+					<Button
+						variant="destructive"
+						isLoading={isPending}
+						onClick={handleDisable}
+					>
+						Disable protection
 					</Button>
 				</DialogFooter>
 			</DialogContent>

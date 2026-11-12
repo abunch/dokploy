@@ -51,6 +51,9 @@ export const getServiceImageDigest = async () => {
 export const getUpdateData = async (
 	currentVersion: string,
 ): Promise<IUpdateData> => {
+	if (process.env.DISABLE_UPDATE_CHECK === "true") {
+		return DEFAULT_UPDATE_DATA;
+	}
 	try {
 		const baseUrl =
 			"https://hub.docker.com/v2/repositories/dokploy/dokploy/tags";

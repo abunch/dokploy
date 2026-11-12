@@ -9,9 +9,6 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 import { OnboardingLayout } from "@/components/layouts/onboarding-layout";
-import { SignInWithGithub } from "@/components/proprietary/auth/sign-in-with-github";
-import { SignInWithGoogle } from "@/components/proprietary/auth/sign-in-with-google";
-import { SignupShowcase } from "@/components/proprietary/auth/signup-showcase";
 import { AlertBlock } from "@/components/shared/alert-block";
 import { Logo } from "@/components/shared/logo";
 import { Button } from "@/components/ui/button";
@@ -170,17 +167,6 @@ const Register = ({ isCloud }: Props) => {
 							</AlertBlock>
 						)}
 						<CardContent className="p-0">
-							{isCloud && (
-								<div className="flex flex-col gap-2">
-									<SignInWithGithub />
-									<SignInWithGoogle />
-								</div>
-							)}
-							{isCloud && (
-								<p className="mb-4 text-center text-xs text-muted-foreground">
-									Or register with email
-								</p>
-							)}
 							<Form {...form}>
 								<form
 									method="post"
@@ -306,17 +292,10 @@ export default Register;
 
 Register.getLayout = (page: ReactElement) => {
 	const isCloud = (page.props as Props).isCloud;
-	return (
-		<OnboardingLayout leftPanel={isCloud ? <SignupShowcase /> : undefined}>
-			{page}
-		</OnboardingLayout>
-	);
+	return <OnboardingLayout>{page}</OnboardingLayout>;
 };
 export async function getServerSideProps(context: GetServerSidePropsContext) {
 	const helpers = generateServerSideHelper(appRouter, context);
-	// Prefetch the public branding so the onboarding logo and app name render
-	// correctly on the server (no flash of default branding).
-	await helpers.whitelabeling.getPublic.prefetch();
 
 	if (IS_CLOUD) {
 		const { user } = await validateRequest(context.req);

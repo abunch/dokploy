@@ -1,4 +1,3 @@
-import { getPublicWhitelabelingConfig } from "@dokploy/server";
 import NextDocument, {
 	type DocumentContext,
 	type DocumentInitialProps,
@@ -77,87 +76,21 @@ export default function Document({
 	);
 }
 
-const SETTINGS_CACHE_TTL = 60 * 1000; // 1 minute
-
-declare global {
-	var __SETTINGS_CACHE: {
-		data: {
-			appName: string | null;
-			appDescription: string | null;
-			ogImageUrl: string | null;
-			faviconHref: string | null;
-			faviconLightHref: string | null;
-			customCss: string | null;
-		};
-		expiresAt: number;
-	} | null;
-}
-
 Document.getInitialProps = async (
 	ctx: DocumentContext,
 ): Promise<DocumentInitialProps & WhitelabelingDocumentProps> => {
 	const initialProps = await NextDocument.getInitialProps(ctx);
-
-	let appName: string | null = null;
-	let appDescription: string | null = null;
-	let ogImageUrl: string | null = null;
-	let faviconHref: string | null = null;
-	let faviconLightHref: string | null = null;
-	let customCss: string | null = null;
-
 	const host = ctx.req?.headers?.host || "localhost:3000";
 	const protocol = ctx.req?.headers?.["x-forwarded-proto"] || "http";
-	const baseUrl = `${protocol}://${host}`;
-
-	if (
-		globalThis.__SETTINGS_CACHE &&
-		globalThis.__SETTINGS_CACHE.expiresAt > Date.now() &&
-		globalThis.__SETTINGS_CACHE.data
-	) {
-		return {
-			...initialProps,
-			...globalThis.__SETTINGS_CACHE.data,
-			baseUrl,
-		};
-	}
-
-	try {
-		const config = await getPublicWhitelabelingConfig();
-		if (config) {
-			appName = config.appName;
-			appDescription = config.appDescription;
-			ogImageUrl = config.ogImageUrl;
-			// Remove any </style> tags to prevent XSS breakout
-			customCss = config.customCss
-				? config.customCss.replace(/<\/\s*style[^>]*>/gi, "")
-				: null;
-			faviconHref = config.faviconUrl || null;
-			faviconLightHref = config.faviconLightUrl || null;
-		}
-	} catch {
-		// Fall back to defaults if settings can't be read (e.g. DB not ready)
-	}
-
-	globalThis.__SETTINGS_CACHE = {
-		data: {
-			appName,
-			appDescription,
-			ogImageUrl,
-			faviconHref,
-			faviconLightHref,
-			customCss,
-		},
-		expiresAt: Date.now() + SETTINGS_CACHE_TTL,
-	};
 
 	return {
 		...initialProps,
-		appName,
-		appDescription,
-		ogImageUrl,
-		faviconHref,
-		faviconLightHref,
-		customCss,
-		baseUrl,
+		appName: null,
+		appDescription: null,
+		ogImageUrl: null,
+		faviconHref: null,
+		faviconLightHref: null,
+		customCss: null,
+		baseUrl: `${protocol}://${host}`,
 	};
 };

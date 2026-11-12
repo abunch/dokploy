@@ -117,6 +117,7 @@ export const AddTemplate = ({ environmentId, baseUrl }: Props) => {
 		},
 	);
 	const { data: isCloud } = api.settings.isCloud.useQuery();
+	const { data: defaultBaseUrl } = api.settings.templatesBaseUrl.useQuery();
 	const { data: servers } = api.server.withSSHKey.useQuery();
 	const { data: tags, isPending: isLoadingTags } = api.compose.getTags.useQuery(
 		{ baseUrl: customBaseUrl },
@@ -421,7 +422,7 @@ export const AddTemplate = ({ environmentId, baseUrl }: Props) => {
 										>
 											{/** biome-ignore lint/performance/noImgElement: this is a valid use for img tag */}
 											<img
-												src={`${customBaseUrl || "https://templates.dokploy.com/"}/blueprints/${template?.id}/${template?.logo}`}
+												src={`${customBaseUrl || defaultBaseUrl}/blueprints/${template?.id}/${template?.logo}`}
 												className={cn(
 													"object-contain",
 													viewMode === "detailed" ? "size-24" : "size-16",

@@ -7,7 +7,10 @@ import { getWebServerSettings } from "@dokploy/server/services/web-server-settin
 import { generateRandomDomain } from "@dokploy/server/templates";
 import { execAsyncRemote } from "@dokploy/server/utils/process/execAsync";
 import { manageDomain } from "@dokploy/server/utils/traefik/domain";
-import { getPublicIpWithFallback } from "@dokploy/server/wss/utils";
+import {
+	getPublicIpWithFallback,
+	isPublicIpLookupDisabled,
+} from "@dokploy/server/wss/utils";
 import { TRPCError } from "@trpc/server";
 import { eq } from "drizzle-orm";
 import type { z } from "zod";
@@ -254,13 +257,15 @@ export const getServerIpCandidates = async (
 				),
 				7000,
 			),
-			withTimeout(
-				execAsyncRemote(
-					serverId,
-					"curl -fsS -m 5 https://ifconfig.me || curl -fsS -m 5 https://icanhazip.com",
-				),
-				7000,
-			),
+			isPublicIpLookupDisabled()
+				? null
+				: withTimeout(
+						execAsyncRemote(
+							serverId,
+							"curl -fsS -m 5 https://ifconfig.me || curl -fsS -m 5 https://icanhazip.com",
+						),
+						7000,
+					),
 		]);
 		for (const output of [interfaceIps?.stdout, publicIp?.stdout]) {
 			for (const detectedIp of parseIpCandidates(output)) {

@@ -50,12 +50,21 @@ interface TemplateMetadata {
 	tags: string[];
 }
 
+// An empty TEMPLATES_URL disables the catalog for networks that must not reach the default host.
+export const getTemplatesBaseUrl = () =>
+	process.env.TEMPLATES_URL ?? "https://templates.dokploy.com";
+
 /**
  * Fetches the list of available templates from meta.json
  */
 export async function fetchTemplatesList(
-	baseUrl = "https://templates.dokploy.com",
+	baseUrl = getTemplatesBaseUrl(),
 ): Promise<TemplateMetadata[]> {
+	if (!baseUrl) {
+		throw new Error(
+			"The template catalog is disabled (TEMPLATES_URL is empty)",
+		);
+	}
 	const response = await fetch(`${baseUrl}/meta.json`, {
 		signal: AbortSignal.timeout(10000),
 	});
@@ -85,7 +94,7 @@ const LOGO_MIME_TYPES: Record<string, string> = {
 
 export async function fetchTemplateLogo(
 	templateId: string,
-	baseUrl = "https://templates.dokploy.com",
+	baseUrl = getTemplatesBaseUrl(),
 ): Promise<string | null> {
 	try {
 		const templates = await fetchTemplatesList(baseUrl);
@@ -122,8 +131,13 @@ export async function fetchTemplateLogo(
  */
 export async function fetchTemplateFiles(
 	templateId: string,
-	baseUrl = "https://templates.dokploy.com",
+	baseUrl = getTemplatesBaseUrl(),
 ): Promise<{ config: CompleteTemplate; dockerCompose: string }> {
+	if (!baseUrl) {
+		throw new Error(
+			"The template catalog is disabled (TEMPLATES_URL is empty)",
+		);
+	}
 	const timeout = AbortSignal.timeout(10000);
 	const [templateYmlResponse, dockerComposeResponse] = await Promise.all([
 		fetch(`${baseUrl}/blueprints/${templateId}/template.toml`, {

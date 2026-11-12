@@ -339,9 +339,6 @@ Invitation.getLayout = (page: ReactElement) => {
 };
 export async function getServerSideProps(ctx: GetServerSidePropsContext) {
 	const helpers = generateServerSideHelper(appRouter, ctx);
-	// Prefetch the public branding so the invitation logo and app name render
-	// correctly on the server (no flash of default branding).
-	await helpers.whitelabeling.getPublic.prefetch();
 
 	const { query } = ctx;
 

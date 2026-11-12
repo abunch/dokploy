@@ -59,6 +59,7 @@ import {
 } from "@dokploy/server";
 import { db } from "@dokploy/server/db";
 import { checkPermission } from "@dokploy/server/services/permission";
+import { getTemplatesBaseUrl } from "@dokploy/server/templates/github";
 import { generateOpenApiDocument } from "@dokploy/trpc-openapi";
 import { TRPCError } from "@trpc/server";
 import { eq, sql } from "drizzle-orm";
@@ -87,7 +88,6 @@ import { appRouter } from "../root";
 import {
 	adminProcedure,
 	createTRPCRouter,
-	enterpriseProcedure,
 	protectedProcedure,
 	publicProcedure,
 	withPermission,
@@ -476,7 +476,7 @@ export const settingsRouter = createTRPCRouter({
 			return true;
 		}),
 
-	updateRemoteServersOnly: enterpriseProcedure
+	updateRemoteServersOnly: adminProcedure
 		.input(z.object({ remoteServersOnly: z.boolean() }))
 		.mutation(async ({ input, ctx }) => {
 			if (IS_CLOUD) {
@@ -520,7 +520,7 @@ export const settingsRouter = createTRPCRouter({
 			return true;
 		}),
 
-	updateEnforceSSO: enterpriseProcedure
+	updateEnforceSSO: adminProcedure
 		.input(z.object({ enforceSSO: z.boolean() }))
 		.mutation(async ({ input, ctx }) => {
 			if (IS_CLOUD) {
@@ -1027,6 +1027,7 @@ export const settingsRouter = createTRPCRouter({
 	isCloud: publicProcedure.query(async () => {
 		return IS_CLOUD;
 	}),
+	templatesBaseUrl: publicProcedure.query(() => getTemplatesBaseUrl()),
 	getPostHogConfig: publicProcedure.query(() => {
 		const key = getPostHogKey();
 		return key ? { key, host: POSTHOG_HOST } : null;

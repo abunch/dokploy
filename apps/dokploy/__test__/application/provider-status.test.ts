@@ -10,7 +10,6 @@ vi.mock("@dokploy/server/services/permission", () => {
 
 vi.mock("@dokploy/server/index", () => ({
 	IS_CLOUD: true,
-	hasValidLicense: vi.fn(async () => false),
 	updateApplication: mockUpdateApplication,
 	findApplicationById: vi.fn(async () => ({
 		applicationId: "app-1",

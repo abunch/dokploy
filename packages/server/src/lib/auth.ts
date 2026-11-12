@@ -21,8 +21,10 @@ import {
 	getTrustedProviders,
 	getUserByToken,
 } from "../services/admin";
-import { createAuditLog } from "../services/proprietary/audit-log";
-import { resolveOrganizationDefaultRole } from "../services/proprietary/license-key";
+import {
+	getOrganizationDefaultRole,
+	writeAuditLog,
+} from "../services/fork/org";
 import {
 	getWebServerSettings,
 	updateWebServerSettings,
@@ -157,23 +159,8 @@ const createBetterAuth = () =>
 					}
 				}
 
-				const isBlockedAuthPath =
-					ctx.path.startsWith("/sign-in/email") ||
-					ctx.path.startsWith("/sign-in/social") ||
-					ctx.path.startsWith("/sign-in/passkey") ||
-					ctx.path.startsWith("/sign-up/email") ||
-					ctx.path.startsWith("/passkey/verify-authentication") ||
-					ctx.path.startsWith("/passkey/generate-authenticate-options");
-
-				if (!IS_CLOUD && isBlockedAuthPath) {
-					const settings = await getWebServerSettings();
-					if (settings?.enforceSSO) {
-						throw new APIError("FORBIDDEN", {
-							message:
-								"SSO is enforced. Direct password, social, and passkey sign-in are disabled.",
-						});
-					}
-				}
+				// enforceSSO is ignored until SSO sign-in is rebuilt (feature 003): honouring it
+				// with no way to start an SSO sign-in would lock every user out.
 			}),
 		},
 		emailVerification: {
@@ -309,7 +296,7 @@ const createBetterAuth = () =>
 								where: eq(schema.member.userId, user.id),
 							});
 							if (membership) {
-								const defaultRole = await resolveOrganizationDefaultRole(
+								const defaultRole = await getOrganizationDefaultRole(
 									membership.organizationId,
 								);
 								if (defaultRole !== membership.role) {
@@ -375,7 +362,7 @@ const createBetterAuth = () =>
 								});
 							}
 							const defaultRole = provider.organizationId
-								? await resolveOrganizationDefaultRole(provider.organizationId)
+								? await getOrganizationDefaultRole(provider.organizationId)
 								: "member";
 							await db.insert(schema.member).values({
 								userId: user.id,
@@ -424,7 +411,7 @@ const createBetterAuth = () =>
 							with: { user: true },
 						});
 						if (!memberRecord) return;
-						await createAuditLog({
+						await writeAuditLog({
 							organizationId: orgId,
 							userId: session.userId,
 							userEmail: memberRecord.user.email,
@@ -448,7 +435,7 @@ const createBetterAuth = () =>
 							with: { user: true },
 						});
 						if (!memberRecord) return;
-						await createAuditLog({
+						await writeAuditLog({
 							organizationId: orgId,
 							userId: session.userId,
 							userEmail: memberRecord.user.email,

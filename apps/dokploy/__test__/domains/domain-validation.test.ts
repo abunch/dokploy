@@ -35,6 +35,7 @@ vi.mock("@dokploy/server/services/web-server-settings", () => ({
 
 vi.mock("@dokploy/server/wss/utils", () => ({
 	getPublicIpWithFallback: mocks.getPublicIpWithFallback,
+	isPublicIpLookupDisabled: () => false,
 }));
 
 describe("getServerIpCandidates", () => {
