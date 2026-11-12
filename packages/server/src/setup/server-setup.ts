@@ -654,6 +654,28 @@ inProviders && /^[[:space:]]+[^[:space:]#]/ {
 END { printf "%s", blanks; if (unsupported) exit 2; exit !removed }
 `;
 
+const disableTraefikPhoneHomeAwk = `
+/^  (checkNewVersion|sendAnonymousUsage):/ { next }
+/^global:/ { found = 1; lines[++n] = "global:"; lines[++n] = "  checkNewVersion: false"; lines[++n] = "  sendAnonymousUsage: false"; next }
+{ lines[++n] = $0 }
+END {
+	if (!found) { print "global:"; print "  checkNewVersion: false"; print "  sendAnonymousUsage: false" }
+	for (i = 1; i <= n; i++) print lines[i]
+}
+`;
+
+// Existing installs were written before Traefik's version check and usage report were pinned off.
+export const disableTraefikPhoneHomeScript = (configPath: string) => `
+	if ! grep -q "^  checkNewVersion: false" "${configPath}" || ! grep -q "^  sendAnonymousUsage: false" "${configPath}"; then
+		tmp=$(mktemp)
+		awk '${disableTraefikPhoneHomeAwk}' "${configPath}" > "$tmp"
+		cp "${configPath}" "${configPath}.pre-version-check.bak"
+		cat "$tmp" > "${configPath}"
+		rm -f "$tmp"
+		echo "Disabled Traefik version check and usage report; takes effect when Traefik restarts ✅"
+	fi
+`;
+
 export const createServerTraefikConfig = (
 	traefikDir = "/etc/dokploy/traefik",
 ) => {
@@ -667,6 +689,7 @@ export const createServerTraefikConfig = (
 	fi
 	if [ -f "${configPath}" ]; then
 		echo "Traefik config already exists ✅"
+		${disableTraefikPhoneHomeScript(configPath)}
 		if ${isSwarmWorker}; then
 			(
 				command -v flock > /dev/null && flock 9

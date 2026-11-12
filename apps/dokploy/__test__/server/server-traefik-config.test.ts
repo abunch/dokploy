@@ -85,6 +85,7 @@ const withoutSwarm = (yaml: string) => {
 
 const handEdited = `# Custom Traefik config
 global:
+  checkNewVersion: false
   sendAnonymousUsage: false
 
 providers:
@@ -166,7 +167,10 @@ describe("createServerTraefikConfig", () => {
 	});
 
 	it("removes an inline Swarm provider on a worker", () => {
-		const original = `providers:
+		const original = `global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+providers:
   swarm: { exposedByDefault: false }
   docker:
     exposedByDefault: false
@@ -181,7 +185,10 @@ api:
 	it.each([
 		[
 			"a multiline flow mapping",
-			`providers:
+			`global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+providers:
   swarm: {
     exposedByDefault: false
   }
@@ -191,7 +198,10 @@ api:
 		],
 		[
 			"a quoted key",
-			`providers:
+			`global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+providers:
   "swarm":
     exposedByDefault: false
   docker:
@@ -200,7 +210,10 @@ api:
 		],
 		[
 			"an inline providers mapping",
-			`providers: { swarm: { exposedByDefault: false }, docker: {} }
+			`global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+providers: { swarm: { exposedByDefault: false }, docker: {} }
 `,
 		],
 	])(

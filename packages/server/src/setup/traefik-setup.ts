@@ -2,6 +2,7 @@ import {
 	chmodSync,
 	existsSync,
 	mkdirSync,
+	readFileSync,
 	rmSync,
 	statSync,
 	writeFileSync,
@@ -12,7 +13,7 @@ import type {
 	ContainerCreateOptions,
 	CreateServiceOptions,
 } from "dockerode";
-import { stringify } from "yaml";
+import { parse, stringify } from "yaml";
 import { paths } from "../constants";
 import { sleep } from "../utils/process/execAsync";
 import { getRemoteDocker } from "../utils/servers/remote-docker";
@@ -398,11 +399,28 @@ export const createDefaultServerTraefikConfig = () => {
 	);
 };
 
+// Traefik checks for new versions online unless told not to; neither check nor usage report may leave.
+export const TRAEFIK_GLOBAL = {
+	checkNewVersion: false,
+	sendAnonymousUsage: false,
+};
+
+export const disableTraefikPhoneHome = (yamlText: string): string | null => {
+	const config = (parse(yamlText) ?? {}) as MainTraefikConfig;
+	const current = config.global ?? {};
+	if (
+		current.checkNewVersion === false &&
+		current.sendAnonymousUsage === false
+	) {
+		return null;
+	}
+	config.global = { ...current, ...TRAEFIK_GLOBAL };
+	return stringify(config);
+};
+
 export const getDefaultTraefikConfig = () => {
 	const configObject: MainTraefikConfig = {
-		global: {
-			sendAnonymousUsage: false,
-		},
+		global: TRAEFIK_GLOBAL,
 		providers: {
 			...(process.env.NODE_ENV === "development"
 				? {
@@ -470,6 +488,7 @@ export const getDefaultTraefikConfig = () => {
 
 export const getDefaultServerTraefikConfig = (withSwarmProvider = true) => {
 	const configObject: MainTraefikConfig = {
+		global: TRAEFIK_GLOBAL,
 		providers: {
 			...(withSwarmProvider && {
 				swarm: {
@@ -544,7 +563,13 @@ export const createDefaultTraefikConfig = () => {
 			console.log("Found traefik.yml as directory, removing it...");
 			rmSync(mainConfig, { recursive: true, force: true });
 		} else if (stats.isFile()) {
-			console.log("Main config already exists");
+			const updated = disableTraefikPhoneHome(readFileSync(mainConfig, "utf8"));
+			if (updated) {
+				writeFileSync(mainConfig, updated, "utf8");
+				console.log(
+					"Disabled Traefik version check; takes effect when Traefik restarts",
+				);
+			}
 			return;
 		}
 	}

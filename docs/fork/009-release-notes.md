@@ -24,6 +24,15 @@ switched off.
 - **Build telemetry**: `NEXT_TELEMETRY_DISABLED=1` in the image.
 - **Development-only trusted origin** pointing at a third-party ngrok host.
 
+## Pinned off
+
+- **Traefik version check** (`checkNewVersion`), on by default upstream, and the usage report. New
+  configs carry both as `false`; existing configs are rewritten (local on startup, remote on server
+  setup, with a backup) and pick it up when Traefik next restarts.
+- **better-auth telemetry**, set to disabled in code so environment variables cannot enable it.
+
+See `docs/fork/instrumentation.md` for everything that still records or reports activity and why.
+
 ## Added
 
 - Content-Security-Policy on every response: scripts, styles, fonts, images and connections only to

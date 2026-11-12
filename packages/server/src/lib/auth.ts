@@ -68,6 +68,8 @@ const createBetterAuth = () =>
 			provider: "pg",
 			schema: schema,
 		}),
+		// better-auth reports usage only when also given an endpoint; pin it off so env vars cannot enable it.
+		telemetry: { enabled: false },
 		disabledPaths: [
 			"/sso/register",
 			"/organization/create",

@@ -117,3 +117,59 @@ describe("shipped code", () => {
 		expect(offenders).toEqual([]);
 	});
 });
+
+describe("traefik", () => {
+	it("pins the version check and usage report off in new configs", async () => {
+		const { getDefaultTraefikConfig, getDefaultServerTraefikConfig } =
+			await import("@dokploy/server/setup/traefik-setup");
+		for (const yaml of [
+			getDefaultTraefikConfig(),
+			getDefaultServerTraefikConfig(),
+			getDefaultServerTraefikConfig(false),
+		]) {
+			expect(yaml).toContain("checkNewVersion: false");
+			expect(yaml).toContain("sendAnonymousUsage: false");
+		}
+	});
+
+	it("rewrites an existing local config that lacks the flags", async () => {
+		const { disableTraefikPhoneHome } = await import(
+			"@dokploy/server/setup/traefik-setup"
+		);
+		const updated = disableTraefikPhoneHome(
+			"global:\n  sendAnonymousUsage: false\nentryPoints:\n  web:\n    address: :80\n",
+		);
+		expect(updated).toContain("checkNewVersion: false");
+		expect(updated).toContain("address: :80");
+		expect(disableTraefikPhoneHome(updated ?? "")).toBeNull();
+	});
+
+	it("rewrites an existing remote config with the setup script", async () => {
+		const { execFileSync } = await import("node:child_process");
+		const { mkdtempSync, readFileSync, writeFileSync } = await import(
+			"node:fs"
+		);
+		const { tmpdir } = await import("node:os");
+		const { disableTraefikPhoneHomeScript } = await import(
+			"@dokploy/server/setup/server-setup"
+		);
+		const dir = mkdtempSync(join(tmpdir(), "traefik-"));
+		const cases = [
+			"providers:\n  docker:\n    exposedByDefault: false\n",
+			"global:\n  checkNewVersion: true\n  sendAnonymousUsage: false\nproviders: {}\n",
+			"global: {}\nproviders: {}\n",
+		];
+		for (const [index, original] of cases.entries()) {
+			const file = join(dir, `traefik-${index}.yml`);
+			writeFileSync(file, original);
+			execFileSync("bash", ["-c", disableTraefikPhoneHomeScript(file)]);
+			const result = readFileSync(file, "utf8");
+			expect(result).toMatch(
+				/^global:\n {2}checkNewVersion: false\n {2}sendAnonymousUsage: false\n/,
+			);
+			expect(result).not.toContain("checkNewVersion: true");
+			expect(result.match(/^global:/gm)).toHaveLength(1);
+			expect(result).toContain("providers:");
+		}
+	});
+});
