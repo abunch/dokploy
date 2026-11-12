@@ -1,8 +1,5 @@
 import { db } from "@dokploy/server/db";
-import {
-	deleteOrganization,
-	IS_CLOUD,
-} from "@dokploy/server/index";
+import { deleteOrganization, IS_CLOUD } from "@dokploy/server/index";
 import { TRPCError } from "@trpc/server";
 import { and, desc, eq, exists } from "drizzle-orm";
 import { nanoid } from "nanoid";
