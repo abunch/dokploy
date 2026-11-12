@@ -1,7 +1,6 @@
 import {
 	createBackup,
 	findBackupById,
-	findBackupsByDbId,
 	findComposeByBackupId,
 	findComposeById,
 	findLibsqlByBackupId,
@@ -16,7 +15,6 @@ import {
 	findPostgresById,
 	findServerById,
 	getBackupDownloadUrl,
-	IS_CLOUD,
 	keepLatestNBackups,
 	listBackupFilesByBackupId,
 	type RcloneFile,
@@ -63,7 +61,6 @@ import {
 	withPermission,
 } from "@/server/api/trpc";
 import { audit } from "@/server/api/utils/audit";
-import { assertDatabaseBackupLimit } from "@/server/api/utils/plan-limits";
 import {
 	apiCreateBackup,
 	apiFindOneBackup,
@@ -71,7 +68,6 @@ import {
 	apiRestoreBackup,
 	apiUpdateBackup,
 } from "@/server/db/schema";
-import { removeJob, schedule, updateJob } from "@/server/utils/backup";
 
 export const backupRouter = createTRPCRouter({
 	create: protectedProcedure
@@ -95,62 +91,13 @@ export const backupRouter = createTRPCRouter({
 					);
 				}
 
-				if (IS_CLOUD) {
-					const dbType = (
-						["postgres", "mysql", "mariadb", "mongo", "libsql"] as const
-					).find((type) => input[`${type}Id`]);
-					if (dbType) {
-						const existingBackups = await findBackupsByDbId(
-							input[`${dbType}Id`]!,
-							dbType,
-						);
-						await assertDatabaseBackupLimit(
-							ctx.session.activeOrganizationId,
-							existingBackups.length,
-						);
-					}
-				}
-
 				const newBackup = await createBackup(input);
 				const backup = await findBackupById(newBackup.backupId);
 
-				if (IS_CLOUD && backup.enabled) {
-					const databaseType = backup.databaseType;
-					let serverId = "";
-					if (databaseType === "postgres" && backup.postgres?.serverId) {
-						serverId = backup.postgres.serverId;
-					} else if (databaseType === "mysql" && backup.mysql?.serverId) {
-						serverId = backup.mysql.serverId;
-					} else if (databaseType === "mongo" && backup.mongo?.serverId) {
-						serverId = backup.mongo.serverId;
-					} else if (databaseType === "mariadb" && backup.mariadb?.serverId) {
-						serverId = backup.mariadb.serverId;
-					} else if (databaseType === "libsql" && backup.libsql?.serverId) {
-						serverId = backup.libsql.serverId;
-					} else if (
-						backup.backupType === "compose" &&
-						backup.compose?.serverId
-					) {
-						serverId = backup.compose.serverId;
-					}
-					const server = await findServerById(serverId);
-
-					if (server.serverStatus === "inactive") {
-						throw new TRPCError({
-							code: "NOT_FOUND",
-							message: "Server is inactive",
-						});
-					}
-					await schedule({
-						cronSchedule: backup.schedule,
-						backupId: backup.backupId,
-						type: "backup",
-					});
-				} else {
-					if (backup.enabled) {
-						scheduleBackup(backup);
-					}
+				if (backup.enabled) {
+					scheduleBackup(backup);
 				}
+
 				await audit(ctx, {
 					action: "create",
 					resourceType: "backup",
@@ -213,28 +160,13 @@ export const backupRouter = createTRPCRouter({
 				await updateBackupById(input.backupId, input);
 				const backup = await findBackupById(input.backupId);
 
-				if (IS_CLOUD) {
-					if (backup.enabled) {
-						await updateJob({
-							cronSchedule: backup.schedule,
-							backupId: backup.backupId,
-							type: "backup",
-						});
-					} else {
-						await removeJob({
-							cronSchedule: backup.schedule,
-							backupId: backup.backupId,
-							type: "backup",
-						});
-					}
+				if (backup.enabled) {
+					removeScheduleBackup(input.backupId);
+					scheduleBackup(backup);
 				} else {
-					if (backup.enabled) {
-						removeScheduleBackup(input.backupId);
-						scheduleBackup(backup);
-					} else {
-						removeScheduleBackup(input.backupId);
-					}
+					removeScheduleBackup(input.backupId);
 				}
+
 				await audit(ctx, {
 					action: "update",
 					resourceType: "backup",
@@ -268,15 +200,8 @@ export const backupRouter = createTRPCRouter({
 				}
 
 				const value = await removeBackupById(input.backupId);
-				if (IS_CLOUD && value) {
-					await removeJob({
-						backupId: input.backupId,
-						cronSchedule: value.schedule,
-						type: "backup",
-					});
-				} else if (!IS_CLOUD) {
-					removeScheduleBackup(input.backupId);
-				}
+				removeScheduleBackup(input.backupId);
+
 				await audit(ctx, {
 					action: "delete",
 					resourceType: "backup",

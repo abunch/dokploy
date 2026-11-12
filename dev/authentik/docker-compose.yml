@@ -1,0 +1,59 @@
+# Local identity provider for developing and testing SSO (feature 003). Not for production.
+name: dokploy-dev-authentik
+
+x-authentik-env: &authentik-env
+  AUTHENTIK_SECRET_KEY: dev-only-secret-key-change-me-0123456789abcdef
+  AUTHENTIK_POSTGRESQL__HOST: postgresql
+  AUTHENTIK_POSTGRESQL__USER: authentik
+  AUTHENTIK_POSTGRESQL__NAME: authentik
+  AUTHENTIK_POSTGRESQL__PASSWORD: authentik-dev
+  AUTHENTIK_BOOTSTRAP_EMAIL: akadmin@dokploy.test
+  AUTHENTIK_BOOTSTRAP_PASSWORD: akadmin-dev-password
+  AUTHENTIK_BOOTSTRAP_TOKEN: dokploy-dev-api-token
+  # Authentik must not phone home either.
+  AUTHENTIK_DISABLE_UPDATE_CHECK: "true"
+  AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
+  AUTHENTIK_DISABLE_STARTUP_ANALYTICS: "true"
+  AUTHENTIK_AVATARS: initials
+
+services:
+  postgresql:
+    image: docker.io/library/postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: authentik
+      POSTGRES_PASSWORD: authentik-dev
+      POSTGRES_DB: authentik
+    volumes:
+      - database:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d authentik -U authentik"]
+      interval: 5s
+      retries: 10
+
+  server:
+    image: ghcr.io/goauthentik/server:2026.8.5
+    restart: unless-stopped
+    command: server
+    environment: *authentik-env
+    volumes:
+      - ./blueprints:/blueprints/custom:ro
+    ports:
+      - "127.0.0.1:9000:9000"
+    depends_on:
+      postgresql:
+        condition: service_healthy
+
+  worker:
+    image: ghcr.io/goauthentik/server:2026.8.5
+    restart: unless-stopped
+    command: worker
+    environment: *authentik-env
+    volumes:
+      - ./blueprints:/blueprints/custom:ro
+    depends_on:
+      postgresql:
+        condition: service_healthy
+
+volumes:
+  database:

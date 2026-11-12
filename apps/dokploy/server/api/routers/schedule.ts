@@ -24,8 +24,6 @@ import { TRPCError } from "@trpc/server";
 import { asc, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { audit } from "@/server/api/utils/audit";
-import { assertScheduledJobLimit } from "@/server/api/utils/plan-limits";
-import { removeJob, schedule, updateJob } from "@/server/utils/backup";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 export const scheduleRouter = createTRPCRouter({
@@ -39,23 +37,8 @@ export const scheduleRouter = createTRPCRouter({
 				await checkServicePermissionAndAccess(ctx, serviceId, {
 					schedule: ["create"],
 				});
-				if (IS_CLOUD) {
-					await assertScheduledJobLimit(
-						ctx.session.activeOrganizationId,
-						input.applicationId ? "application" : "compose",
-						serviceId,
-					);
-				}
 			} else {
 				await checkPermission(ctx, { schedule: ["create"] });
-
-				if (IS_CLOUD && input.scheduleType === "server" && input.serverId) {
-					await assertScheduledJobLimit(
-						ctx.session.activeOrganizationId,
-						"server",
-						input.serverId,
-					);
-				}
 			}
 			const newSchedule = await createSchedule({
 				...input,
@@ -65,16 +48,7 @@ export const scheduleRouter = createTRPCRouter({
 			});
 
 			if (newSchedule?.enabled) {
-				if (IS_CLOUD) {
-					await schedule({
-						scheduleId: newSchedule.scheduleId,
-						type: "schedule",
-						cronSchedule: newSchedule.cronExpression,
-						timezone: newSchedule.timezone,
-					});
-				} else {
-					scheduleJob(newSchedule);
-				}
+				scheduleJob(newSchedule);
 			}
 			await audit(ctx, {
 				action: "create",
@@ -128,30 +102,13 @@ export const scheduleRouter = createTRPCRouter({
 			}
 			const updatedSchedule = await updateSchedule(input);
 
-			if (IS_CLOUD) {
-				if (updatedSchedule?.enabled) {
-					await updateJob({
-						scheduleId: updatedSchedule.scheduleId,
-						type: "schedule",
-						cronSchedule: updatedSchedule.cronExpression,
-						timezone: updatedSchedule.timezone,
-					});
-				} else {
-					await removeJob({
-						cronSchedule: updatedSchedule.cronExpression,
-						scheduleId: updatedSchedule.scheduleId,
-						type: "schedule",
-						timezone: updatedSchedule.timezone,
-					});
-				}
+			if (updatedSchedule?.enabled) {
+				removeScheduleJob(updatedSchedule.scheduleId);
+				scheduleJob(updatedSchedule);
 			} else {
-				if (updatedSchedule?.enabled) {
-					removeScheduleJob(updatedSchedule.scheduleId);
-					scheduleJob(updatedSchedule);
-				} else {
-					removeScheduleJob(updatedSchedule.scheduleId);
-				}
+				removeScheduleJob(updatedSchedule.scheduleId);
 			}
+
 			await audit(ctx, {
 				action: "update",
 				resourceType: "schedule",
@@ -181,16 +138,8 @@ export const scheduleRouter = createTRPCRouter({
 			}
 			await deleteSchedule(input.scheduleId);
 
-			if (IS_CLOUD) {
-				await removeJob({
-					cronSchedule: scheduleItem.cronExpression,
-					scheduleId: scheduleItem.scheduleId,
-					type: "schedule",
-					timezone: scheduleItem.timezone,
-				});
-			} else {
-				removeScheduleJob(scheduleItem.scheduleId);
-			}
+			removeScheduleJob(scheduleItem.scheduleId);
+
 			await audit(ctx, {
 				action: "delete",
 				resourceType: "schedule",

@@ -16,6 +16,7 @@ import {
 	IS_CLOUD,
 	rebuildDatabase,
 	removeMySqlById,
+	removeScheduleBackup,
 	removeService,
 	startService,
 	startServiceRemote,
@@ -51,7 +52,6 @@ import {
 	mysql as mysqlTable,
 	projects,
 } from "@/server/db/schema";
-import { cancelJobs } from "@/server/utils/backup";
 
 export const mysqlRouter = createTRPCRouter({
 	create: protectedProcedure
@@ -347,7 +347,13 @@ export const mysqlRouter = createTRPCRouter({
 			const backups = await findBackupsByDbId(input.mysqlId, "mysql");
 			const cleanupOperations = [
 				async () => await removeService(mongo?.appName, mongo.serverId),
-				async () => await cancelJobs(backups),
+				async () => {
+					for (const backup of backups) {
+						if (backup.enabled) {
+							removeScheduleBackup(backup.backupId);
+						}
+					}
+				},
 				async () => await removeMySqlById(input.mysqlId),
 			];
 

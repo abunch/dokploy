@@ -1,0 +1,68 @@
+# Test fixture: a Dokploy OIDC application and users in each group the role mapping tests use.
+version: 1
+metadata:
+  name: Dokploy development SSO
+entries:
+  - model: authentik_core.group
+    id: group-admins
+    identifiers:
+      name: dokploy-admins
+  - model: authentik_core.group
+    id: group-developers
+    identifiers:
+      name: dokploy-developers
+
+  - model: authentik_core.user
+    identifiers:
+      username: alice
+    attrs:
+      name: Alice Admin
+      email: alice@dokploy.test
+      password: alice-dev-password
+      groups:
+        - !KeyOf group-admins
+  - model: authentik_core.user
+    identifiers:
+      username: bob
+    attrs:
+      name: Bob Developer
+      email: bob@dokploy.test
+      password: bob-dev-password
+      groups:
+        - !KeyOf group-developers
+  - model: authentik_core.user
+    identifiers:
+      username: carol
+    attrs:
+      name: Carol NoGroup
+      email: carol@dokploy.test
+      password: carol-dev-password
+
+  - model: authentik_providers_oauth2.oauth2provider
+    id: provider
+    identifiers:
+      name: Dokploy
+    attrs:
+      authorization_flow: !Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]
+      invalidation_flow: !Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]
+      client_type: confidential
+      grant_types:
+        - authorization_code
+        - refresh_token
+      client_id: dokploy-dev
+      client_secret: dokploy-dev-client-secret
+      redirect_uris:
+        - matching_mode: regex
+          url: "http://localhost:3000/api/auth/sso/callback/.*"
+      signing_key: !Find [authentik_crypto.certificatekeypair, [name, authentik Self-signed Certificate]]
+      property_mappings:
+        - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-openid]]
+        - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-email]]
+        - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-profile]]
+
+  - model: authentik_core.application
+    identifiers:
+      slug: dokploy
+    attrs:
+      name: Dokploy
+      provider: !KeyOf provider

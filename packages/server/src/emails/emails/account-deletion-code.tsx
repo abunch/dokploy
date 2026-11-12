@@ -4,7 +4,6 @@ import {
 	Head,
 	Heading,
 	Html,
-	Img,
 	Link,
 	Preview,
 	Section,
@@ -32,16 +31,6 @@ export const AccountDeletionCodeTemplate = ({
 			<Tailwind config={emailTailwindConfig}>
 				<Body className="bg-[#f4f4f5] my-auto mx-auto font-sans">
 					<Container className="my-[40px] mx-auto max-w-[520px]">
-						<Section className="bg-[#09090b] rounded-t-xl px-[40px] py-[32px] text-center">
-							<Img
-								src="https://raw.githubusercontent.com/Dokploy/website/refs/heads/main/apps/docs/public/logo-dokploy-blackpng.png"
-								width="190"
-								height="120"
-								alt="Dokploy"
-								className="my-0 mx-auto"
-							/>
-						</Section>
-
 						<Section className="bg-white px-[40px] py-[32px]">
 							<Heading className="text-[#09090b] text-[22px] font-semibold m-0 mb-[8px]">
 								Confirm your account deletion

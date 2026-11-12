@@ -12,7 +12,6 @@ import {
 	ChevronsUpDown,
 	CircleHelp,
 	Clock,
-	CreditCard,
 	Folder,
 	Forward,
 	GalleryVerticalEnd,
@@ -23,6 +22,7 @@ import {
 	KeyRound,
 	LayoutGrid,
 	Loader2,
+	LogIn,
 	type LucideIcon,
 	Package,
 	ScrollText,
@@ -98,13 +98,11 @@ import { cn } from "@/lib/utils";
 import type { AppRouter } from "@/server/api/root";
 import { api } from "@/utils/api";
 import { useWhitelabeling } from "@/utils/hooks/use-whitelabeling";
-import { TrialBanner } from "../dashboard/billing/trial-banner";
 import { AddOrganization } from "../dashboard/organization/handle-organization";
 import { DialogAction } from "../shared/dialog-action";
 import { Logo } from "../shared/logo";
 import { Button } from "../ui/button";
 import { TimeBadge } from "../ui/time-badge";
-import { UpdateServerButton } from "./update-server";
 import { UserNav } from "./user-nav";
 
 // The types of the queries we are going to use
@@ -331,6 +329,13 @@ const MENU: Menu = {
 		},
 		{
 			isSingle: true,
+			title: "Single sign-on",
+			icon: LogIn,
+			url: "/dashboard/settings/sso",
+			isEnabled: ({ auth }) => auth?.role === "owner" || auth?.role === "admin",
+		},
+		{
+			isSingle: true,
 			title: "SSH Keys",
 			icon: KeyRound,
 			url: "/dashboard/settings/ssh-keys",
@@ -415,14 +420,6 @@ const MENU: Menu = {
 			icon: Bell,
 			// Only enabled for users with access to notifications
 			isEnabled: ({ permissions }) => !!permissions?.notification.read,
-		},
-		{
-			isSingle: true,
-			title: "Billing",
-			url: "/dashboard/settings/billing",
-			icon: CreditCard,
-			// Only enabled for owners in cloud environments
-			isEnabled: ({ auth, isCloud }) => !!(auth?.role === "owner" && isCloud),
 		},
 	],
 
@@ -1178,11 +1175,6 @@ export default function Page({ children }: Props) {
 				</SidebarContent>
 				<SidebarFooter>
 					<SidebarMenu className="flex flex-col gap-2">
-						{!isCloud && permissions?.organization.update && (
-							<SidebarMenuItem>
-								<UpdateServerButton />
-							</SidebarMenuItem>
-						)}
 						<SidebarMenuItem>
 							<UserNav />
 						</SidebarMenuItem>
@@ -1201,7 +1193,6 @@ export default function Page({ children }: Props) {
 				<SidebarRail />
 			</Sidebar>
 			<SidebarInset>
-				{isCloud === true && <TrialBanner />}
 				{!includesProjects && (
 					<header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
 						<div className="flex items-center justify-between w-full px-4">

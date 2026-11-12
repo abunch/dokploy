@@ -40,7 +40,6 @@ import { HandleServers } from "./handle-servers";
 import { ShowServerSecurity } from "./security/show-server-security";
 import { SetupServer } from "./setup-server";
 import { ShowMonitoringModal } from "./show-monitoring-modal";
-import { WelcomeSubscription } from "./welcome-stripe/welcome-subscription";
 
 export const ShowServers = () => {
 	const router = useRouter();
@@ -48,13 +47,10 @@ export const ShowServers = () => {
 	const { data, refetch, isPending } = api.server.all.useQuery();
 	const { data: sshKeys } = api.sshKey.all.useQuery();
 	const { data: isCloud } = api.settings.isCloud.useQuery();
-	const { data: canCreateMoreServers } =
-		api.stripe.canCreateMoreServers.useQuery();
 	const { data: permissions } = api.user.getPermissions.useQuery();
 
 	return (
 		<div className="w-full">
-			{query?.success && isCloud && <WelcomeSubscription />}
 			<Card className="h-full  p-2.5 rounded-xl  max-w-5xl mx-auto">
 				<div className="rounded-xl bg-background shadow-md ">
 					<CardHeader className="">

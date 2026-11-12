@@ -1,6 +1,6 @@
 import { standardSchemaResolver as zodResolver } from "@hookform/resolvers/standard-schema";
 import { Loader2, Palette, User } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -27,7 +27,7 @@ import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { getAvatarType, isSolidColorAvatar } from "@/lib/avatar-utils";
-import { generateSHA256Hash, getFallbackAvatarInitials } from "@/lib/utils";
+import { getFallbackAvatarInitials } from "@/lib/utils";
 import { api } from "@/utils/api";
 import { Configure2FA } from "./configure-2fa";
 import { Enable2FA } from "./enable-2fa";
@@ -74,15 +74,7 @@ export const ProfileForm = () => {
 		isError,
 		error,
 	} = api.user.update.useMutation();
-	const [gravatarHash, setGravatarHash] = useState<string | null>(null);
 	const colorInputRef = useRef<HTMLInputElement>(null);
-
-	const availableAvatars = useMemo(() => {
-		if (gravatarHash === null) return randomImages;
-		return randomImages.concat([
-			`https://www.gravatar.com/avatar/${gravatarHash}`,
-		]);
-	}, [gravatarHash]);
 
 	const form = useForm({
 		defaultValues: {
@@ -114,12 +106,6 @@ export const ProfileForm = () => {
 				},
 			);
 			form.setValue("allowImpersonation", data?.user?.allowImpersonation);
-
-			if (data.user.email) {
-				generateSHA256Hash(data.user.email).then((hash) => {
-					setGravatarHash(hash);
-				});
-			}
 		}
 	}, [form, data]);
 
@@ -394,7 +380,7 @@ export const ProfileForm = () => {
 																		/>
 																	</FormLabel>
 																</FormItem>
-																{availableAvatars.map((image) => (
+																{randomImages.map((image) => (
 																	<FormItem key={image}>
 																		<FormLabel className="[&:has([data-state=checked])>img]:border-primary [&:has([data-state=checked])>img]:border [&:has([data-state=checked])>img]:p-px cursor-pointer">
 																			<FormControl>

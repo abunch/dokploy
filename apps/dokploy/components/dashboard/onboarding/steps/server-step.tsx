@@ -106,8 +106,6 @@ export const ServerStep = ({ onNext, plainTitle }: Props) => {
 		}
 	}, [existingServers, createdServerId]);
 
-	const { data: canCreateMoreServers } =
-		api.stripe.canCreateMoreServers.useQuery();
 	const { mutateAsync: createServer, isPending: isCreating } =
 		api.server.create.useMutation();
 	const checkIsReady = (validation?: {
@@ -223,12 +221,6 @@ export const ServerStep = ({ onNext, plainTitle }: Props) => {
 
 			{!createdServerId ? (
 				<div className="flex flex-col gap-4 max-w-sm">
-					{canCreateMoreServers === false && (
-						<AlertBlock type="warning">
-							You'll need a plan or trial before connecting a server — go back
-							to the "Pick a plan" step.
-						</AlertBlock>
-					)}
 					<div className="flex flex-col gap-2 rounded-lg border p-3">
 						<span className="text-xs font-medium text-muted-foreground">
 							1. Run this on your server to authorize Dokploy
@@ -289,7 +281,7 @@ export const ServerStep = ({ onNext, plainTitle }: Props) => {
 							<Button
 								type="submit"
 								isLoading={isCreating}
-								disabled={!cloudSSHKey || canCreateMoreServers === false}
+								disabled={!cloudSSHKey}
 								className="mt-2"
 							>
 								Connect server

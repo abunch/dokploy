@@ -1,5 +1,4 @@
 import {
-	captureEvent,
 	createServer,
 	defaultCommand,
 	deleteServer,
@@ -7,12 +6,10 @@ import {
 	findServersByUserId,
 	findUserById,
 	getAccessibleServerIds,
-	getPostHogSessionId,
-	getPublicIpWithFallback,
 	getServicesByServerId,
+	getWebServerSettings,
 	haveActiveServices,
 	IS_CLOUD,
-	isPublicIpLookupDisabled,
 	redactServerSshKey,
 	removeDeploymentsByServerId,
 	removeServerVectorAgent,
@@ -31,7 +28,6 @@ import { TRPCError } from "@trpc/server";
 import { observable } from "@trpc/server/observable";
 import { and, desc, eq, getTableColumns, isNotNull, sql } from "drizzle-orm";
 import { z } from "zod";
-import { updateServersBasedOnQuantity } from "@/pages/api/stripe/webhook";
 import {
 	createTRPCRouter,
 	protectedProcedure,
@@ -105,13 +101,6 @@ export const serverRouter = createTRPCRouter({
 					resourceId: project.serverId,
 					resourceName: project.name,
 				});
-				void captureEvent({
-					distinctId: user.id,
-					event: "server_created",
-					organizationId: ctx.session.activeOrganizationId,
-					sessionId: getPostHogSessionId(ctx.req.headers),
-					properties: { server_type: project.serverType },
-				});
 				return project;
 			} catch (error) {
 				if (error instanceof TRPCError) {
@@ -151,10 +140,7 @@ export const serverRouter = createTRPCRouter({
 		.query(async ({ input }) => {
 			const server = await findServerById(input.serverId);
 			const isBuildServer = server.serverType === "build";
-			return defaultCommand(
-				isBuildServer,
-				isPublicIpLookupDisabled() ? server.ipAddress : undefined,
-			);
+			return defaultCommand(isBuildServer, server.ipAddress);
 		}),
 	getServices: withPermission("server", "read")
 		.input(apiFindOneServer)
@@ -520,12 +506,6 @@ export const serverRouter = createTRPCRouter({
 				await removeDeploymentsByServerId(currentServer);
 				await deleteServer(input.serverId);
 
-				if (IS_CLOUD) {
-					const admin = await findUserById(ctx.user.ownerId);
-
-					await updateServersBasedOnQuantity(admin.id, admin.serversQuantity);
-				}
-
 				return {
 					...redactServerSshKey(currentServer),
 					vectorAgentRemovalWarning,
@@ -591,8 +571,8 @@ export const serverRouter = createTRPCRouter({
 		if (IS_CLOUD) {
 			return "";
 		}
-		const ip = await getPublicIpWithFallback();
-		return ip;
+		const settings = await getWebServerSettings();
+		return settings?.serverIp || "";
 	}),
 	getServerTime: protectedProcedure.query(() => {
 		if (IS_CLOUD) {

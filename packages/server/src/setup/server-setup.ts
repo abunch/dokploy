@@ -20,7 +20,6 @@ import {
 import slug from "slugify";
 import { Client } from "ssh2";
 import { recreateDirectory } from "../utils/filesystem/directory";
-import { isPublicIpLookupDisabled } from "../wss/utils";
 import { setupMonitoring } from "./monitoring-setup";
 
 const generateToken = () => {
@@ -308,11 +307,7 @@ const installRequirements = async (
 		client
 			.once("ready", () => {
 				const command =
-					server.command ||
-					defaultCommand(
-						isBuildServer,
-						isPublicIpLookupDisabled() ? server.ipAddress : undefined,
-					);
+					server.command || defaultCommand(isBuildServer, server.ipAddress);
 				client.exec(command, (err, stream) => {
 					if (err) {
 						onData?.(err.message);
@@ -420,52 +415,10 @@ export const setupSwarm = (advertiseAddr?: string) => `
 		if $SUDO_CMD docker info | grep -q 'Swarm: active'; then
 			echo "Already part of a Docker Swarm ✅"
 		else
-			# Get IP address
-			get_ip() {
-				local ip=""
-
-				# Try IPv4 with multiple services
-				# First attempt: ifconfig.io
-				ip=$(curl -4s --connect-timeout 5 https://ifconfig.io 2>/dev/null)
-
-				# Second attempt: icanhazip.com
-				if [ -z "$ip" ]; then
-					ip=$(curl -4s --connect-timeout 5 https://icanhazip.com 2>/dev/null)
-				fi
-
-				# Third attempt: ipecho.net
-				if [ -z "$ip" ]; then
-					ip=$(curl -4s --connect-timeout 5 https://ipecho.net/plain 2>/dev/null)
-				fi
-
-				# If no IPv4, try IPv6 with multiple services
-				if [ -z "$ip" ]; then
-					# Try IPv6 with ifconfig.io
-					ip=$(curl -6s --connect-timeout 5 https://ifconfig.io 2>/dev/null)
-
-					# Try IPv6 with icanhazip.com
-					if [ -z "$ip" ]; then
-						ip=$(curl -6s --connect-timeout 5 https://icanhazip.com 2>/dev/null)
-					fi
-
-					# Try IPv6 with ipecho.net
-					if [ -z "$ip" ]; then
-						ip=$(curl -6s --connect-timeout 5 https://ipecho.net/plain 2>/dev/null)
-					fi
-				fi
-
-				if [ -z "$ip" ]; then
-					echo "Error: Could not determine server IP address automatically (neither IPv4 nor IPv6)." >&2
-					echo "Please set the ADVERTISE_ADDR environment variable manually." >&2
-					echo "Example: export ADVERTISE_ADDR=<your-server-ip>" >&2
-					exit 1
-				fi
-
-				echo "$ip"
-			}
 			advertise_addr="\${ADVERTISE_ADDR:-${advertiseAddr ?? ""}}"
 			if [ -z "$advertise_addr" ]; then
-				advertise_addr=$(get_ip)
+				echo "Error: no advertise address. Set the server's IP address in Dokploy or export ADVERTISE_ADDR." >&2
+				exit 1
 			fi
 			echo "Advertise address: $advertise_addr"
 
@@ -701,6 +654,28 @@ inProviders && /^[[:space:]]+[^[:space:]#]/ {
 END { printf "%s", blanks; if (unsupported) exit 2; exit !removed }
 `;
 
+const disableTraefikPhoneHomeAwk = `
+/^  (checkNewVersion|sendAnonymousUsage):/ { next }
+/^global:/ { found = 1; lines[++n] = "global:"; lines[++n] = "  checkNewVersion: false"; lines[++n] = "  sendAnonymousUsage: false"; next }
+{ lines[++n] = $0 }
+END {
+	if (!found) { print "global:"; print "  checkNewVersion: false"; print "  sendAnonymousUsage: false" }
+	for (i = 1; i <= n; i++) print lines[i]
+}
+`;
+
+// Existing installs were written before Traefik's version check and usage report were pinned off.
+export const disableTraefikPhoneHomeScript = (configPath: string) => `
+	if ! grep -q "^  checkNewVersion: false" "${configPath}" || ! grep -q "^  sendAnonymousUsage: false" "${configPath}"; then
+		tmp=$(mktemp)
+		awk '${disableTraefikPhoneHomeAwk}' "${configPath}" > "$tmp"
+		cp "${configPath}" "${configPath}.pre-version-check.bak"
+		cat "$tmp" > "${configPath}"
+		rm -f "$tmp"
+		echo "Disabled Traefik version check and usage report; takes effect when Traefik restarts ✅"
+	fi
+`;
+
 export const createServerTraefikConfig = (
 	traefikDir = "/etc/dokploy/traefik",
 ) => {
@@ -714,6 +689,7 @@ export const createServerTraefikConfig = (
 	fi
 	if [ -f "${configPath}" ]; then
 		echo "Traefik config already exists ✅"
+		${disableTraefikPhoneHomeScript(configPath)}
 		if ${isSwarmWorker}; then
 			(
 				command -v flock > /dev/null && flock 9

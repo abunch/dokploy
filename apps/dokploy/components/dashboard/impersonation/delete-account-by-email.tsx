@@ -66,9 +66,8 @@ export const DeleteAccountByEmail = () => {
 				<DialogHeader>
 					<DialogTitle>Delete an account by email</DialogTitle>
 					<DialogDescription>
-						Cancels every Stripe subscription and deletes the user with all the
-						organizations they own. Invoices stay in Stripe for accounting. Use
-						it to fulfil data deletion requests.
+						Deletes the user with all the organizations they own. Use it to
+						fulfil data deletion requests.
 					</DialogDescription>
 				</DialogHeader>
 				{record ? (

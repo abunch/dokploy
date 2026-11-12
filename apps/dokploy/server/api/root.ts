@@ -16,6 +16,7 @@ import { dockerImageRouter } from "./routers/docker-image";
 import { dockerVolumeRouter } from "./routers/docker-volume";
 import { domainRouter } from "./routers/domain";
 import { environmentRouter } from "./routers/environment";
+import { forkSsoRouter } from "./routers/fork-sso";
 import { gitProviderRouter } from "./routers/git-provider";
 import { giteaRouter } from "./routers/gitea";
 import { githubRouter } from "./routers/github";
@@ -44,7 +45,6 @@ import { serverRouter } from "./routers/server";
 import { serverSecurityRouter } from "./routers/server-security";
 import { settingsRouter } from "./routers/settings";
 import { sshRouter } from "./routers/ssh-key";
-import { stripeRouter } from "./routers/stripe";
 import { swarmRouter } from "./routers/swarm";
 import { tagRouter } from "./routers/tag";
 import { telemetryProviderRouter } from "./routers/telemetry-provider";
@@ -59,6 +59,7 @@ import { volumeBackupsRouter } from "./routers/volume-backups";
  */
 
 export const appRouter = createTRPCRouter({
+	forkSso: forkSsoRouter,
 	admin: adminRouter,
 	application: applicationRouter,
 	backup: backupRouter,
@@ -98,7 +99,6 @@ export const appRouter = createTRPCRouter({
 	serverSecurity: serverSecurityRouter,
 	settings: settingsRouter,
 	sshKey: sshRouter,
-	stripe: stripeRouter,
 	swarm: swarmRouter,
 	user: userRouter,
 	vaultProvider: vaultProviderRouter,

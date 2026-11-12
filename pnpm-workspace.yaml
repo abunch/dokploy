@@ -1,7 +1,5 @@
 packages:
-  - "apps/api"
   - "apps/dokploy"
-  - "apps/schedules"
   - "packages/server"
 
 # Supply-chain hardening: refuse package versions younger than N days,

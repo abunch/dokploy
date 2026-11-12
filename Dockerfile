@@ -2,6 +2,7 @@
 FROM node:24.22.1-bookworm-slim AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
+ENV NEXT_TELEMETRY_DISABLED=1
 RUN corepack enable
 RUN corepack prepare pnpm@10.22.0 --activate
 

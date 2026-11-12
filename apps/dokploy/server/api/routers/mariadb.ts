@@ -16,6 +16,7 @@ import {
 	IS_CLOUD,
 	rebuildDatabase,
 	removeMariadbById,
+	removeScheduleBackup,
 	removeService,
 	startService,
 	startServiceRemote,
@@ -52,7 +53,6 @@ import {
 	mariadb as mariadbTable,
 	projects,
 } from "@/server/db/schema";
-import { cancelJobs } from "@/server/utils/backup";
 export const mariadbRouter = createTRPCRouter({
 	create: protectedProcedure
 		.input(apiCreateMariaDB)
@@ -297,7 +297,13 @@ export const mariadbRouter = createTRPCRouter({
 			const backups = await findBackupsByDbId(input.mariadbId, "mariadb");
 			const cleanupOperations = [
 				async () => await removeService(mongo?.appName, mongo.serverId),
-				async () => await cancelJobs(backups),
+				async () => {
+					for (const backup of backups) {
+						if (backup.enabled) {
+							removeScheduleBackup(backup.backupId);
+						}
+					}
+				},
 				async () => await removeMariadbById(input.mariadbId),
 			];
 

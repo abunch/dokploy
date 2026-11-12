@@ -33,10 +33,8 @@ import {
 	apiFindAllByServer,
 	apiFindAllByType,
 	deployments,
-	server,
 } from "@/server/db/schema";
 import { myQueue } from "@/server/queues/queueSetup";
-import { fetchDeployApiJobs, type QueueJobRow } from "@/server/utils/deploy";
 import { createTRPCRouter, protectedProcedure, withPermission } from "../trpc";
 
 export const deploymentRouter = createTRPCRouter({
@@ -85,41 +83,26 @@ export const deploymentRouter = createTRPCRouter({
 
 	queueList: withPermission("deployment", "read").query(async ({ ctx }) => {
 		const orgId = ctx.session.activeOrganizationId;
-		let rows: QueueJobRow[];
-
-		if (IS_CLOUD) {
-			const servers = await db.query.server.findMany({
-				where: eq(server.organizationId, orgId),
-				columns: { serverId: true },
-			});
-			const serverRowsArrays = await Promise.all(
-				servers.map(({ serverId }) => fetchDeployApiJobs(serverId)),
-			);
-			rows = serverRowsArrays.flat();
-			rows.sort((a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0));
-		} else {
-			const jobs = await myQueue.getJobs();
-			const jobRows = await Promise.all(
-				jobs.map(async (job) => {
-					const state = await job.getState();
-					return {
-						id: String(job.id),
-						name: job.name ?? undefined,
-						data: job.data as Record<string, unknown>,
-						timestamp: job.timestamp,
-						processedOn: job.processedOn,
-						finishedOn: job.finishedOn,
-						failedReason: job.failedReason ?? undefined,
-						state,
-					};
-				}),
-			);
-			jobRows.sort((a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0));
-			rows = jobRows;
-		}
+		const jobs = await myQueue.getJobs();
+		const jobRows = await Promise.all(
+			jobs.map(async (job) => {
+				const state = await job.getState();
+				return {
+					id: String(job.id),
+					name: job.name ?? undefined,
+					data: job.data as Record<string, unknown>,
+					timestamp: job.timestamp,
+					processedOn: job.processedOn,
+					finishedOn: job.finishedOn,
+					failedReason: job.failedReason ?? undefined,
+					state,
+				};
+			}),
+		);
+		jobRows.sort((a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0));
 
 		return Promise.all(
-			rows.map(async (row) => ({
+			jobRows.map(async (row) => ({
 				...row,
 				servicePath: await resolveServicePath(
 					orgId,

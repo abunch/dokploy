@@ -194,8 +194,6 @@ export const userRouter = createTRPCRouter({
 						image: true,
 						allowImpersonation: true,
 						twoFactorEnabled: true,
-						stripeCustomerId: true,
-						stripeSubscriptionId: true,
 						serversQuantity: true,
 						isEnterpriseCloud: true,
 						sendInvoiceNotifications: true,
