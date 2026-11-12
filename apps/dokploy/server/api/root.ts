@@ -16,6 +16,7 @@ import { dockerImageRouter } from "./routers/docker-image";
 import { dockerVolumeRouter } from "./routers/docker-volume";
 import { domainRouter } from "./routers/domain";
 import { environmentRouter } from "./routers/environment";
+import { forkSsoRouter } from "./routers/fork-sso";
 import { gitProviderRouter } from "./routers/git-provider";
 import { giteaRouter } from "./routers/gitea";
 import { githubRouter } from "./routers/github";
@@ -58,6 +59,7 @@ import { volumeBackupsRouter } from "./routers/volume-backups";
  */
 
 export const appRouter = createTRPCRouter({
+	forkSso: forkSsoRouter,
 	admin: adminRouter,
 	application: applicationRouter,
 	backup: backupRouter,

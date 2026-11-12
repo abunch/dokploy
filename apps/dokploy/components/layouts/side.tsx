@@ -22,6 +22,7 @@ import {
 	KeyRound,
 	LayoutGrid,
 	Loader2,
+	LogIn,
 	type LucideIcon,
 	Package,
 	ScrollText,
@@ -325,6 +326,13 @@ const MENU: Menu = {
 			url: "/dashboard/settings/users",
 			// Only enabled for users with member.read permission
 			isEnabled: ({ permissions }) => !!permissions?.member.read,
+		},
+		{
+			isSingle: true,
+			title: "Single sign-on",
+			icon: LogIn,
+			url: "/dashboard/settings/sso",
+			isEnabled: ({ auth }) => auth?.role === "owner" || auth?.role === "admin",
 		},
 		{
 			isSingle: true,

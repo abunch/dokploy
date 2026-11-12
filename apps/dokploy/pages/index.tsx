@@ -1,7 +1,11 @@
-import { IS_CLOUD, isAdminPresent } from "@dokploy/server";
+import {
+	getWebServerSettings,
+	IS_CLOUD,
+	isAdminPresent,
+} from "@dokploy/server";
 import { validateRequest } from "@dokploy/server/lib/auth";
 import { standardSchemaResolver as zodResolver } from "@hookform/resolvers/standard-schema";
-import { Fingerprint } from "lucide-react";
+import { Fingerprint, KeyRound } from "lucide-react";
 import type { GetServerSidePropsContext } from "next";
 import Link from "next/link";
 import { useRouter } from "next/router";
@@ -50,12 +54,14 @@ type LoginForm = z.infer<typeof LoginSchema>;
 
 interface Props {
 	IS_CLOUD: boolean;
+	ssoOnly?: boolean;
 }
-export default function Home({ IS_CLOUD }: Props) {
+export default function Home({ IS_CLOUD, ssoOnly = false }: Props) {
 	const router = useRouter();
 	const { config: whitelabeling } = useWhitelabelingPublic();
 	const [isLoginLoading, setIsLoginLoading] = useState(false);
 	const [isPasskeyLoading, setIsPasskeyLoading] = useState(false);
+	const [isSsoLoading, setIsSsoLoading] = useState(false);
 	const [isTwoFactorLoading, setIsTwoFactorLoading] = useState(false);
 	const [isBackupCodeLoading, setIsBackupCodeLoading] = useState(false);
 	const [isTwoFactor, setIsTwoFactor] = useState(false);
@@ -86,11 +92,13 @@ export default function Home({ IS_CLOUD }: Props) {
 		const normalized = raw.replace(/[+_]/g, " ").toLowerCase();
 
 		setError(
-			normalized.includes("account not linked")
-				? "This account already exists but isn't linked to that sign-in provider yet. Contact your administrator to link it."
-				: normalized.includes("access denied")
-					? "Access was denied by the identity provider."
-					: "We couldn't complete sign-in. Please try again or contact your administrator.",
+			normalized.includes("sso not allowed")
+				? "Your account is not in a group that is allowed to sign in. Ask your administrator for access."
+				: normalized.includes("account not linked")
+					? "This account already exists but isn't linked to that sign-in provider yet. Contact your administrator to link it."
+					: normalized.includes("access denied")
+						? "Access was denied by the identity provider."
+						: "We couldn't complete sign-in. Please try again or contact your administrator.",
 		);
 
 		const { error: _removed, ...rest } = router.query;
@@ -139,6 +147,31 @@ export default function Home({ IS_CLOUD }: Props) {
 			setIsLoginLoading(false);
 		}
 	};
+	const onSsoSignIn = async () => {
+		const email = loginForm.getValues("email").trim();
+		if (!z.string().email().safeParse(email).success) {
+			loginForm.setError("email", {
+				message: "Enter your work email to sign in with SSO",
+			});
+			return;
+		}
+		setIsSsoLoading(true);
+		setError(null);
+		const { error } = await authClient.signIn.sso({
+			email,
+			callbackURL: "/dashboard/home",
+			errorCallbackURL: "/",
+		});
+		if (error) {
+			setError(
+				error.status === 404
+					? "No single sign-on is set up for that email domain."
+					: error.message || "Could not start single sign-on.",
+			);
+			setIsSsoLoading(false);
+		}
+	};
+
 	const onPasskeySignIn = async () => {
 		setIsPasskeyLoading(true);
 		try {
@@ -267,21 +300,51 @@ export default function Home({ IS_CLOUD }: Props) {
 							</FormItem>
 						)}
 					/>
-					<Button className="w-full" type="submit" isLoading={isLoginLoading}>
-						Login
+					{ssoOnly && (
+						<Button
+							className="w-full"
+							type="button"
+							onClick={onSsoSignIn}
+							isLoading={isSsoLoading}
+						>
+							<KeyRound className="size-4" />
+							Sign in with SSO
+						</Button>
+					)}
+					<Button
+						className="w-full"
+						variant={ssoOnly ? "outline" : "default"}
+						type="submit"
+						isLoading={isLoginLoading}
+					>
+						{ssoOnly ? "Owner sign-in with password" : "Login"}
 					</Button>
 				</form>
 			</Form>
-			<Button
-				variant="outline"
-				className="w-full mt-4"
-				type="button"
-				onClick={onPasskeySignIn}
-				isLoading={isPasskeyLoading}
-			>
-				<Fingerprint className="size-4" />
-				Sign in with Passkey
-			</Button>
+			{!ssoOnly && (
+				<>
+					<Button
+						variant="outline"
+						className="w-full mt-4"
+						type="button"
+						onClick={onSsoSignIn}
+						isLoading={isSsoLoading}
+					>
+						<KeyRound className="size-4" />
+						Sign in with SSO
+					</Button>
+					<Button
+						variant="outline"
+						className="w-full mt-4"
+						type="button"
+						onClick={onPasskeySignIn}
+						isLoading={isPasskeyLoading}
+					>
+						<Fingerprint className="size-4" />
+						Sign in with Passkey
+					</Button>
+				</>
+			)}
 		</>
 	);
 
@@ -569,10 +632,13 @@ export async function getServerSideProps(context: GetServerSidePropsContext) {
 		};
 	}
 
+	const settings = await getWebServerSettings();
+
 	return {
 		props: {
 			trpcState: helpers.dehydrate(),
 			hasAdmin,
+			ssoOnly: settings?.enforceSSO ?? false,
 		},
 	};
 }

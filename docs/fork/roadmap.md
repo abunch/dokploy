@@ -11,7 +11,7 @@ New capabilities go through Spec Kit (`/speckit-specify` → `/speckit-plan` →
 |---|------|-------|--------|-------|
 | 001 | Remove `/proprietary`, stub the core files that import it, delete the license cron and gates, no phone-home | Spec Kit | Own | First feature; everything else builds on it |
 | 002 | TaskFlow Swarm and reliability fixes | Issue/PR | TaskFlow-Systems/dokploy `AgentHits-Dev` | Merges cleanly onto upstream; drop its edits to `proprietary/` files; provenance check |
-| 003 | OIDC SSO with IdP group → role mapping, SSO-only mode, break-glass login | Spec Kit | Milpia/mlp-dokploy `specs/001-keycloak-sso` | Seed the spec from Milpia's (Apache); 26 conflicts and 4 migrations on top of 002 |
+| 003 | OIDC SSO with IdP group → role mapping, SSO-only mode, break-glass login | Spec Kit | Own spec on better-auth's MIT `sso` plugin | Built without Milpia's code; tested end to end against local Authentik (`dev/authentik`) |
 | 004 | Audit log: always-on trail, viewer, filters, CSV export, retention | Spec Kit | Behavioural spec; ghaaf-labs/crane as design reference | Uses the existing `audit()` calls |
 | 005 | Upstream PRs for AWS and Swarm | Issue/PR | Dokploy PRs #4141 (ECR), #5270, #5702, #5828, #5187, #5218/#5776, #5205, #4405, #5038 (terminal) | Port as-is with credit. Add a scheduled job that refreshes ECR tokens (IAM role) every 6h and re-applies registry auth to services, since Swarm workers ignore credential helpers and ECR tokens expire after 12h |
 | 006 | Consolidate migrations into one chain; test upgrade from an upstream database | Issue/PR | Own | After 002–005 land |

@@ -26,6 +26,12 @@ import {
 	writeAuditLog,
 } from "../services/fork/org";
 import {
+	checkSsoOnlySignIn,
+	getSsoRoleSettings,
+	readGroupsClaim,
+	syncSsoMembership,
+} from "../services/fork/sso-roles";
+import {
 	getWebServerSettings,
 	updateWebServerSettings,
 } from "../services/web-server-settings";
@@ -72,6 +78,13 @@ const createBetterAuth = () =>
 		telemetry: { enabled: false },
 		disabledPaths: [
 			"/sso/register",
+			// Providers are managed through the permission-checked forkSso tRPC router only.
+			"/sso/update-provider",
+			"/sso/delete-provider",
+			"/sso/get-provider",
+			"/sso/providers",
+			"/sso/request-domain-verification",
+			"/sso/verify-domain",
 			"/organization/create",
 			"/organization/update",
 			"/organization/delete",
@@ -153,8 +166,43 @@ const createBetterAuth = () =>
 					}
 				}
 
-				// enforceSSO is ignored until SSO sign-in is rebuilt (feature 003): honouring it
-				// with no way to start an SSO sign-in would lock every user out.
+				const ssoOnly = await checkSsoOnlySignIn(
+					ctx.path,
+					ctx.body?.email,
+					() =>
+						getWebServerSettings().then((settings) => !!settings?.enforceSSO),
+				);
+				if (ssoOnly.status === "refused") {
+					throw new APIError("FORBIDDEN", {
+						message:
+							'This platform requires single sign-on. Use "Sign in with SSO".',
+					});
+				}
+				if (ssoOnly.status === "owner-break-glass") {
+					await writeAuditLog({
+						organizationId: ssoOnly.owner.organizationId,
+						userId: ssoOnly.owner.userId,
+						userEmail: ssoOnly.owner.email,
+						userRole: "owner",
+						action: "login",
+						resourceType: "security",
+						resourceName:
+							"break-glass password sign-in attempt while SSO is required",
+					});
+				}
+			}),
+			after: createAuthMiddleware(async (ctx) => {
+				// A refused SSO sign-in should land on the sign-in page with a reason, not a raw error.
+				const returned = ctx.context.returned;
+				if (
+					ctx.path.startsWith("/sso/callback") &&
+					returned instanceof APIError &&
+					returned.status === "FORBIDDEN"
+				) {
+					throw ctx.redirect(
+						`${ctx.context.baseURL.replace(/\/api\/auth$/, "")}/?error=sso_not_allowed`,
+					);
+				}
 			}),
 		},
 		emailVerification: {
@@ -450,7 +498,31 @@ const createBetterAuth = () =>
 				enableMetadata: true,
 				references: "user",
 			}),
-			sso({ trustEmailVerified: true }),
+			sso({
+				trustEmailVerified: true,
+				provisionUserOnEveryLogin: true,
+				provisionUser: async ({ user, userInfo, token, provider }) => {
+					if (!provider.organizationId) return;
+					const settings = await getSsoRoleSettings(provider.providerId);
+					const groups = readGroupsClaim(
+						settings.groupsClaim,
+						token?.idToken,
+						userInfo,
+					);
+					const result = await syncSsoMembership({
+						userId: user.id,
+						organizationId: provider.organizationId,
+						groups,
+						settings,
+					});
+					if (result.status === "refused") {
+						throw new APIError("FORBIDDEN", {
+							message:
+								"Your account is not in a group that is allowed to sign in.",
+						});
+					}
+				},
+			}),
 			scim({
 				beforeSCIMTokenGenerated: async ({ user }) => {
 					const dbUser = await db.query.user.findFirst({

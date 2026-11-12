@@ -24,6 +24,7 @@
 	"api.z.ai": "operator-integration: default endpoint for a provider the operator configures",
 	"app.americancloud.com": "link: shown to the user as a link, never fetched by the platform",
 	"app.infisical.com": "operator-integration: default endpoint for a provider the operator configures",
+	"auth.example.com": "example: placeholder text in a form field",
 	"betterstack.com": "link: shown to the user as a link, never fetched by the platform",
 	"bitbucket.org": "operator-integration: default endpoint for a provider the operator configures",
 	"bunnycdn.com": "comment: reference in a code comment",
