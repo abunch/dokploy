@@ -17,6 +17,7 @@ New capabilities go through Spec Kit (`/speckit-specify` → `/speckit-plan` →
 | 006 | Consolidate migrations into one chain; test upgrade from an upstream database | Issue/PR | Own | After 002–005 land |
 | 007 | Rebrand, CI, image publishing, install script | Spec Kit | Own | Needs the product name |
 | 008 | End-to-end QA on a multi-node Swarm in AWS | Issue | Own | Release gate |
+| 009 | Zero egress: delete analytics, tracking, billing, Cloud services, update check, self-update, IP lookups; content policy; CI host allowlist | Spec Kit | Own | Follows 001; user requires removal, not switches |
 
 ## Later
 
