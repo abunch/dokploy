@@ -14,7 +14,8 @@
 			"!**/dist",
 			"!**/drizzle/**",
 			"!node_modules/**",
-			"!packages/server/package.json"
+			"!packages/server/package.json",
+			"!.specify/**"
 		],
 		"maxSize": 2097152,
 		"experimentalScannerIgnores": [".next", "node_modules", ".docker", "dist"]
