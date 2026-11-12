@@ -21,8 +21,7 @@ export const getPublicIpWithFallback = async () => {
 	if (isPublicIpLookupDisabled()) {
 		return null;
 	}
-	// @ts-expect-error
-	let ip = null;
+	let ip: string | null = null;
 	try {
 		ip = await publicIpv4();
 	} catch (error) {
