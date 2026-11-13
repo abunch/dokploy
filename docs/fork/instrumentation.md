@@ -35,7 +35,7 @@ unless the operator configures a destination.
 | Sessions | Active sign-ins with IP address and browser user agent | `session` table | Revoke in Settings → Sessions |
 | Traefik access log | The "Requests" page: per-request host, path, status, timing | Access log file on each server | Turn off on the Requests page |
 | Container stats ("free" monitoring) | Live CPU, memory, network per container in the UI | Read on demand from Docker, not stored | Not opened = not collected |
-| Monitoring agent (`dokploy/monitoring`) | Server and container metrics history and threshold alerts | SQLite on each server, retention set in the UI; alerts post back to this platform | Leave server monitoring disabled |
+| Monitoring agent (image you build from `Dockerfile.monitoring`, set as `MONITORING_IMAGE`) | Server and container metrics history and threshold alerts | SQLite on each server, retention set in the UI; alerts post back to this platform | Leave server monitoring disabled |
 
 ## Kept: leaves only to destinations you configure
 
@@ -45,6 +45,15 @@ unless the operator configures a destination.
 | Notifications | Deploy, backup, threshold and restart alerts | Only the channels you add | No channel configured |
 | AI features | Compose generation and log analysis | Only the AI endpoint you configure; log analysis sends the log text you submit | No AI provider configured |
 | Backups | Database and volume backups | Only the S3 destinations you add | No destination configured |
+
+## Supply chain
+
+| What | Status |
+|---|---|
+| `@scarf/scarf` (pulled in by Swagger UI) | Install-time analytics to scarf.sh. Its install script is not allowed to run, and `scarfSettings.enabled=false`, `SCARF_ANALYTICS=false` and `DO_NOT_TRACK=1` are set for local installs, CI and the image build |
+| `@dokploy/trpc-openapi` | Vendor-published MIT fork of trpc-openapi; audited: no network calls, no install scripts |
+| `dokploy/monitoring` image | No longer used: it runs with the Docker socket and host `/proc` and `/sys`, so only an image built from this repository is accepted |
+| Upstream release workflow (`dokploy.yml`) | Removed: it published to the vendor's Docker Hub account and cloned the vendor's CLI repository |
 
 ## Third-party components
 

@@ -30,10 +30,6 @@ vi.mock("@dokploy/server/services/server", () => ({
 	}),
 }));
 
-vi.mock("@dokploy/server/services/settings", () => ({
-	getDokployImageTag: vi.fn(() => "latest"),
-}));
-
 vi.mock("@dokploy/server/utils/docker/utils", () => ({
 	pullImage: vi.fn().mockResolvedValue(undefined),
 	pullRemoteImage: vi.fn().mockResolvedValue(undefined),
@@ -167,6 +163,7 @@ describe.skipIf(!hasDocker() || hasRealMonitoring() || !process.env.CI)(
 	"setupMonitoring - legacy container cleanup (real docker)",
 	() => {
 		beforeEach(async () => {
+			vi.stubEnv("MONITORING_IMAGE", TEST_IMAGE);
 			await pullTestImage();
 			await cleanup();
 		}, REAL_TEST_TIMEOUT);

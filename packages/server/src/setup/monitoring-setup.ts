@@ -1,24 +1,20 @@
 import { findServerById } from "@dokploy/server/services/server";
 import { getWebServerSettings } from "@dokploy/server/services/web-server-settings";
 import type { CreateServiceOptions } from "dockerode";
-import { IS_CLOUD } from "../constants";
-import { getDokployImageTag } from "../services/settings";
 import { pullImage, pullRemoteImage } from "../utils/docker/utils";
 import { execAsync, execAsyncRemote } from "../utils/process/execAsync";
 import { getRemoteDocker } from "../utils/servers/remote-docker";
 
-const getMonitoringImage = () => {
-	let imageName = "dokploy/monitoring:latest";
-
-	if (
-		(getDokployImageTag() !== "latest" ||
-			process.env.NODE_ENV === "development") &&
-		!IS_CLOUD
-	) {
-		imageName = "dokploy/monitoring:canary";
+// The agent runs with the Docker socket and the host's /proc and /sys, so it must be an image built
+// from this repository (Dockerfile.monitoring), never the vendor's published one.
+export const getMonitoringImage = () => {
+	const image = process.env.MONITORING_IMAGE?.trim();
+	if (!image) {
+		throw new Error(
+			"Monitoring needs MONITORING_IMAGE: build it from this repository with Dockerfile.monitoring, push it to your registry and set MONITORING_IMAGE to that image.",
+		);
 	}
-
-	return imageName;
+	return image;
 };
 
 // Swarm tasks are dokploy-monitoring.<slot>.<id>, so this only matches the
