@@ -173,3 +173,37 @@ describe("traefik", () => {
 		}
 	});
 });
+
+describe("supply chain", () => {
+	const root = join(__dirname, "../../../..");
+	const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+
+	it("opts out of install analytics and never runs Scarf's install script", () => {
+		expect(pkg.scarfSettings?.enabled).toBe(false);
+		expect(pkg.pnpm.onlyBuiltDependencies).not.toContain("@scarf/scarf");
+	});
+
+	it("only runs a monitoring image the operator built", async () => {
+		const { getMonitoringImage } = await import(
+			"@dokploy/server/setup/monitoring-setup"
+		);
+		vi.stubEnv("MONITORING_IMAGE", "");
+		expect(() => getMonitoringImage()).toThrow(/Dockerfile.monitoring/);
+		vi.stubEnv("MONITORING_IMAGE", "registry.internal/monitoring:1.0");
+		expect(getMonitoringImage()).toBe("registry.internal/monitoring:1.0");
+	});
+
+	it("references no vendor-published images", () => {
+		const files = ["../../packages/server/src", "server"].flatMap((dir) =>
+			readdirSync(join(__dirname, "../..", dir), { recursive: true })
+				.map((entry) => join(__dirname, "../..", dir, String(entry)))
+				.filter((file) => /\.(ts|tsx)$/.test(file)),
+		);
+		const offenders = files.filter((file) =>
+			/["'`]dokploy\/(monitoring|dokploy)[:"'`]/.test(
+				readFileSync(file, "utf8"),
+			),
+		);
+		expect(offenders).toEqual([]);
+	});
+});
