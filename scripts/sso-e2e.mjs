@@ -99,12 +99,16 @@ const authentikLogin = async (jar, authorizeUrl, username, password) => {
 	throw new Error("Authentik login did not finish");
 };
 
-const signInWithSso = async (email, username, password) => {
+// Starts from the email (domain routing) or, with providerId, the way a sign-in button does.
+const signInWithSso = async (email, username, password, providerId) => {
 	const jar = new Jar();
 	const start = await request(jar, `${PLATFORM_URL}/api/auth/sign-in/sso`, {
 		method: "POST",
 		headers: { "content-type": "application/json", origin: PLATFORM_URL },
-		body: JSON.stringify({ email, callbackURL: "/dashboard/home" }),
+		body: JSON.stringify({
+			...(providerId ? { providerId } : { email }),
+			callbackURL: "/dashboard/home",
+		}),
 	});
 	const body = await start.json();
 	if (!body.url) throw new Error(`SSO start failed: ${JSON.stringify(body)}`);
@@ -153,6 +157,21 @@ for (const [email, username, password, expectedRole] of users) {
 	} catch (error) {
 		check(`${username} signs in with SSO`, false, error.message);
 	}
+}
+
+{
+	const { jar, landed } = await signInWithSso(
+		undefined,
+		"bob",
+		"bob-dev-password",
+		"authentik",
+	);
+	const member = await trpc(jar, "user.get");
+	check(
+		"one-click sign-in by provider (no email) works",
+		landed.includes("/dashboard") && member?.user?.email === "bob@dokploy.test",
+		`landed ${landed}`,
+	);
 }
 
 const AUTHENTIK_URL = process.env.AUTHENTIK_URL ?? "http://localhost:9000";

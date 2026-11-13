@@ -10,8 +10,14 @@ or specifications were used.
   issuer URL, client ID, client secret and email domains. The platform validates the issuer's
   discovery document before saving and shows the redirect URI to register. Secrets are never sent
   back to the browser.
-- **Sign in with SSO** on the sign-in page: enter a work email and you are sent to that domain's
-  provider. First-time users get an account automatically.
+- **One-click sign-in**: the sign-in page shows a "Sign in with <name>" button per provider (name
+  set as the provider's button label) that goes straight to the identity provider; no email first.
+  With more than three providers it asks for an email and routes by domain instead. First-time
+  users get an account automatically.
+- **Auto-redirect**: with SSO required and a single provider, opening the platform goes straight to
+  the identity provider. It is skipped after signing out (otherwise the provider would sign you
+  straight back in), after a sign-in error, and on `/?password=1`, where owners reach the
+  password form. Provider button labels are visible to anyone who opens the sign-in page.
 - **Group → role mapping**: map identity-provider groups to admin or member. Roles are re-applied
   at every SSO sign-in, so changes in the identity provider take effect at the next sign-in. The
   highest matching role wins; owners are never changed. Optional "require a mapped group" refuses

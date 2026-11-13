@@ -4,6 +4,7 @@ import {
 	member,
 	type SsoMappedRole,
 	type SsoRoleMapping,
+	ssoProvider,
 	user,
 } from "@dokploy/server/db/schema";
 import { and, eq } from "drizzle-orm";
@@ -16,6 +17,53 @@ export interface SsoRoleSettings {
 	defaultRole: SsoMappedRole;
 	requireMappedGroup: boolean;
 }
+
+// More providers than this and the sign-in page asks for an email instead of showing a button each.
+export const MAX_SSO_BUTTONS = 3;
+
+export interface SsoLoginOptions {
+	buttons: { providerId: string; label: string }[];
+	emailRouting: boolean;
+	autoRedirectProviderId: string | null;
+}
+
+export const buildSsoLoginOptions = (
+	providers: { providerId: string; displayName: string | null }[],
+	ssoRequired: boolean,
+): SsoLoginOptions => {
+	if (providers.length === 0) {
+		return { buttons: [], emailRouting: false, autoRedirectProviderId: null };
+	}
+	if (providers.length > MAX_SSO_BUTTONS) {
+		return { buttons: [], emailRouting: true, autoRedirectProviderId: null };
+	}
+	return {
+		buttons: providers.map((p) => ({
+			providerId: p.providerId,
+			label: p.displayName?.trim() || p.providerId,
+		})),
+		emailRouting: false,
+		autoRedirectProviderId:
+			ssoRequired && providers.length === 1
+				? (providers[0]?.providerId ?? null)
+				: null,
+	};
+};
+
+export const getSsoLoginOptions = async (ssoRequired: boolean) => {
+	const rows = await db
+		.select({
+			providerId: ssoProvider.providerId,
+			displayName: forkSsoSettings.displayName,
+		})
+		.from(ssoProvider)
+		.leftJoin(
+			forkSsoSettings,
+			eq(forkSsoSettings.providerId, ssoProvider.providerId),
+		)
+		.orderBy(ssoProvider.createdAt);
+	return buildSsoLoginOptions(rows, ssoRequired);
+};
 
 export const defaultSsoRoleSettings: SsoRoleSettings = {
 	groupsClaim: "groups",

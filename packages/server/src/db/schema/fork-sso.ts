@@ -15,6 +15,7 @@ export const forkSsoSettings = pgTable("fork_sso_settings", {
 	providerId: text("provider_id")
 		.primaryKey()
 		.references(() => ssoProvider.providerId, { onDelete: "cascade" }),
+	displayName: text("display_name"),
 	groupsClaim: text("groups_claim").notNull().default("groups"),
 	roleMappings: jsonb("role_mappings")
 		.$type<SsoRoleMapping[]>()
@@ -38,6 +39,7 @@ export const forkSsoSettingsRelations = relations(
 );
 
 export const ssoSettingsInputSchema = z.object({
+	displayName: z.string().trim().max(50).optional(),
 	groupsClaim: z.string().trim().min(1).max(100).default("groups"),
 	roleMappings: z
 		.array(

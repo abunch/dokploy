@@ -20,6 +20,7 @@ const mockDb = vi.hoisted(() => {
 vi.mock("@dokploy/server/db", () => ({ db: mockDb }));
 
 const {
+	buildSsoLoginOptions,
 	checkSsoOnlySignIn,
 	readGroupsClaim,
 	resolveSsoRole,
@@ -240,5 +241,54 @@ describe("SSO-only sign-in", () => {
 				status: "refused",
 			});
 		}
+	});
+});
+
+describe("sign-in page options", () => {
+	const provider = (providerId: string, displayName: string | null = null) => ({
+		providerId,
+		displayName,
+	});
+
+	it("shows one button per provider, labelled by display name", () => {
+		expect(
+			buildSsoLoginOptions(
+				[provider("corp", "Company SSO"), provider("partners")],
+				false,
+			).buttons,
+		).toEqual([
+			{ providerId: "corp", label: "Company SSO" },
+			{ providerId: "partners", label: "partners" },
+		]);
+	});
+
+	it("auto-redirects only when SSO is required and there is exactly one provider", () => {
+		expect(
+			buildSsoLoginOptions([provider("corp")], true).autoRedirectProviderId,
+		).toBe("corp");
+		expect(
+			buildSsoLoginOptions([provider("corp")], false).autoRedirectProviderId,
+		).toBeNull();
+		expect(
+			buildSsoLoginOptions([provider("a"), provider("b")], true)
+				.autoRedirectProviderId,
+		).toBeNull();
+	});
+
+	it("switches to email routing with many providers", () => {
+		const many = ["a", "b", "c", "d"].map((id) => provider(id));
+		expect(buildSsoLoginOptions(many, true)).toEqual({
+			buttons: [],
+			emailRouting: true,
+			autoRedirectProviderId: null,
+		});
+	});
+
+	it("shows nothing without providers", () => {
+		expect(buildSsoLoginOptions([], true)).toEqual({
+			buttons: [],
+			emailRouting: false,
+			autoRedirectProviderId: null,
+		});
 	});
 });

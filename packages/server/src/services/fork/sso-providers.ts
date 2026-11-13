@@ -100,8 +100,10 @@ export const listSsoProviders = async (organizationId: string) => {
 			clientId: config?.clientId ?? "",
 			domains: row.domain.split(",").map((d) => d.trim()),
 			createdAt: row.createdAt,
+			displayName: own?.displayName ?? "",
 			settings: own
 				? {
+						displayName: own.displayName ?? undefined,
 						groupsClaim: own.groupsClaim,
 						roleMappings: own.roleMappings,
 						defaultRole: own.defaultRole,
