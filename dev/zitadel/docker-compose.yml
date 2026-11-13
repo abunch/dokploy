@@ -1,0 +1,54 @@
+# Local Zitadel for testing SSO role mapping (feature 003). Not for production.
+name: dokploy-dev-zitadel
+
+services:
+  db:
+    image: docker.io/library/postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: zitadel-dev
+    volumes:
+      - database:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      retries: 10
+
+  zitadel:
+    image: ghcr.io/zitadel/zitadel:v4.20.3
+    restart: unless-stopped
+    user: "0"
+    command: start-from-init --masterkey "DevOnlyMasterkeyOf32Characters!!" --tlsMode disabled
+    environment:
+      ZITADEL_EXTERNALDOMAIN: localhost
+      ZITADEL_EXTERNALPORT: 8085
+      ZITADEL_EXTERNALSECURE: "false"
+      ZITADEL_DATABASE_POSTGRES_HOST: db
+      ZITADEL_DATABASE_POSTGRES_PORT: 5432
+      ZITADEL_DATABASE_POSTGRES_DATABASE: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_USERNAME: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_PASSWORD: zitadel-dev
+      ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE: disable
+      ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME: postgres
+      ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD: zitadel-dev
+      ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE: disable
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_USERNAME: dokploy-dev-admin
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_NAME: Dokploy dev admin
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_PAT_EXPIRATIONDATE: "2030-01-01T00:00:00Z"
+      ZITADEL_FIRSTINSTANCE_PATPATH: /machinekey/pat
+      # The classic server-rendered login, so tests can drive it without the separate login app.
+      ZITADEL_DEFAULTINSTANCE_FEATURES_LOGINV2_REQUIRED: "false"
+      ZITADEL_FIRSTINSTANCE_FEATURES_LOGINV2_REQUIRED: "false"
+      ZITADEL_TELEMETRY_ENABLED: "false"
+    volumes:
+      - machinekey:/machinekey
+    ports:
+      - "127.0.0.1:8085:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  database:
+  machinekey:

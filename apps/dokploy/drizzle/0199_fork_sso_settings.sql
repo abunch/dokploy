@@ -1,6 +1,7 @@
 CREATE TABLE "fork_sso_settings" (
 	"provider_id" text PRIMARY KEY NOT NULL,
 	"display_name" text,
+	"enabled" boolean DEFAULT true NOT NULL,
 	"groups_claim" text DEFAULT 'groups' NOT NULL,
 	"role_mappings" jsonb DEFAULT '[]'::jsonb NOT NULL,
 	"default_role" text DEFAULT 'member' NOT NULL,

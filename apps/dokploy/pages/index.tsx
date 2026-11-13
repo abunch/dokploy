@@ -111,13 +111,15 @@ export default function Home({
 		const normalized = raw.replace(/[+_]/g, " ").toLowerCase();
 
 		setError(
-			normalized.includes("sso not allowed")
-				? "Your account is not in a group that is allowed to sign in. Ask your administrator for access."
-				: normalized.includes("account not linked")
-					? "This account already exists but isn't linked to that sign-in provider yet. Contact your administrator to link it."
-					: normalized.includes("access denied")
-						? "Access was denied by the identity provider."
-						: "We couldn't complete sign-in. Please try again or contact your administrator.",
+			normalized.includes("sso provider inactive")
+				? "That sign-in provider is no longer active. Try again from the sign-in page."
+				: normalized.includes("sso not allowed")
+					? "Your account is not in a group that is allowed to sign in. Ask your administrator for access."
+					: normalized.includes("account not linked")
+						? "This account already exists but isn't linked to that sign-in provider yet. Contact your administrator to link it."
+						: normalized.includes("access denied")
+							? "Access was denied by the identity provider."
+							: "We couldn't complete sign-in. Please try again or contact your administrator.",
 		);
 
 		const { error: _removed, ...rest } = router.query;

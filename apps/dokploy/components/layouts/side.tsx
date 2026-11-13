@@ -332,7 +332,7 @@ const MENU: Menu = {
 			title: "Single sign-on",
 			icon: LogIn,
 			url: "/dashboard/settings/sso",
-			isEnabled: ({ auth }) => auth?.role === "owner" || auth?.role === "admin",
+			isEnabled: ({ auth }) => auth?.role === "owner",
 		},
 		{
 			isSingle: true,

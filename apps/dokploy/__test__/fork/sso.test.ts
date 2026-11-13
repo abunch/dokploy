@@ -3,14 +3,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mockDb = vi.hoisted(() => {
 	const values = vi.fn().mockResolvedValue(undefined);
 	const where = vi.fn().mockResolvedValue(undefined);
+	const activeRows = vi.fn().mockResolvedValue([]);
 	return {
+		activeRows,
+		select: vi.fn(() => ({
+			from: vi.fn(() => ({ leftJoin: vi.fn(() => activeRows()) })),
+		})),
 		values,
 		where,
 		insert: vi.fn(() => ({ values })),
 		update: vi.fn(() => ({ set: vi.fn(() => ({ where })) })),
 		delete: vi.fn(() => ({ where })),
 		query: {
-			member: { findFirst: vi.fn() },
+			member: { findFirst: vi.fn(), findMany: vi.fn() },
+			ssoProvider: { findFirst: vi.fn() },
 			user: { findFirst: vi.fn() },
 			forkSsoSettings: { findFirst: vi.fn() },
 		},
@@ -22,6 +28,8 @@ vi.mock("@dokploy/server/db", () => ({ db: mockDb }));
 const {
 	buildSsoLoginOptions,
 	checkSsoOnlySignIn,
+	isSsoAccountLinkAllowed,
+	resolveSsoStart,
 	readGroupsClaim,
 	resolveSsoRole,
 	syncSsoMembership,
@@ -80,6 +88,22 @@ describe("readGroupsClaim", () => {
 		expect(readGroupsClaim("roles", undefined, { roles: ["x", 3] })).toEqual([
 			"x",
 		]);
+	});
+
+	it("reads Zitadel's role object as role names", () => {
+		const claim = "urn:zitadel:iam:org:project:roles";
+		expect(
+			readGroupsClaim(
+				claim,
+				jwt({
+					[claim]: {
+						"dokploy-admins": { "123": "acme.zitadel.cloud" },
+						developers: { "123": "acme.zitadel.cloud" },
+					},
+				}),
+				{},
+			),
+		).toEqual(["dokploy-admins", "developers"]);
 	});
 
 	it("treats a missing or malformed claim as no groups", () => {
@@ -290,5 +314,111 @@ describe("sign-in page options", () => {
 			emailRouting: false,
 			autoRedirectProviderId: null,
 		});
+	});
+});
+
+describe("starting an SSO sign-in", () => {
+	const providers = [
+		{ providerId: "old", domain: "dokploy.test", enabled: false },
+		{ providerId: "new", domain: "dokploy.test", enabled: true },
+	];
+
+	beforeEach(() => {
+		mockDb.activeRows.mockResolvedValue(providers);
+	});
+
+	it("routes an email to the active provider when an inactive one shares the domain", async () => {
+		expect(
+			await resolveSsoStart(
+				"/sign-in/sso",
+				{ email: "bob@dokploy.test" },
+				undefined,
+			),
+		).toEqual({ status: "allowed", providerId: "new" });
+	});
+
+	it("routes subdomain emails too", async () => {
+		expect(
+			await resolveSsoStart(
+				"/sign-in/sso",
+				{ email: "bob@eu.dokploy.test" },
+				undefined,
+			),
+		).toEqual({ status: "allowed", providerId: "new" });
+	});
+
+	it("refuses an inactive provider by id, at start and at callback", async () => {
+		expect(
+			await resolveSsoStart("/sign-in/sso", { providerId: "old" }, undefined),
+		).toEqual({ status: "refused", reason: "inactive" });
+		expect(
+			await resolveSsoStart("/sso/callback/old", undefined, {
+				providerId: "old",
+			}),
+		).toEqual({ status: "refused", reason: "inactive" });
+	});
+
+	it("refuses an email with no active provider", async () => {
+		expect(
+			await resolveSsoStart(
+				"/sign-in/sso",
+				{ email: "eve@other.test" },
+				undefined,
+			),
+		).toEqual({ status: "refused", reason: "no-provider" });
+	});
+
+	it("treats providers without fork settings as active", async () => {
+		mockDb.activeRows.mockResolvedValue([
+			{ providerId: "legacy", domain: "dokploy.test", enabled: null },
+		]);
+		expect(
+			await resolveSsoStart(
+				"/sign-in/sso",
+				{ providerId: "legacy" },
+				undefined,
+			),
+		).toEqual({ status: "allowed", providerId: "legacy" });
+	});
+
+	it("ignores other paths", async () => {
+		expect(await resolveSsoStart("/get-session", undefined, undefined)).toEqual(
+			{
+				status: "not-applicable",
+			},
+		);
+	});
+});
+
+describe("linking an SSO identity to an existing account", () => {
+	beforeEach(() => {
+		mockDb.query.ssoProvider.findFirst.mockResolvedValue({
+			organizationId: "org-a",
+		});
+	});
+
+	it("allows a member of the provider's organization", async () => {
+		mockDb.query.member.findMany.mockResolvedValue([
+			{ organizationId: "org-a" },
+			{ organizationId: "org-b" },
+		]);
+		expect(await isSsoAccountLinkAllowed("u1", "zitadel")).toBe(true);
+	});
+
+	it("allows a person with no organization yet", async () => {
+		mockDb.query.member.findMany.mockResolvedValue([]);
+		expect(await isSsoAccountLinkAllowed("u1", "zitadel")).toBe(true);
+	});
+
+	it("refuses an account that only belongs to another organization", async () => {
+		mockDb.query.member.findMany.mockResolvedValue([
+			{ organizationId: "org-b" },
+		]);
+		expect(await isSsoAccountLinkAllowed("u1", "zitadel")).toBe(false);
+	});
+
+	it("ignores accounts that are not SSO", async () => {
+		mockDb.query.ssoProvider.findFirst.mockResolvedValue(undefined);
+		expect(await isSsoAccountLinkAllowed("u1", "credential")).toBe(true);
 	});
 });

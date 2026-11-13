@@ -38,7 +38,7 @@ export async function getServerSideProps(ctx: GetServerSidePropsContext) {
 		transformer: superjson,
 	});
 	const membership = await helpers.user.get.fetch();
-	if (membership?.role !== "owner" && membership?.role !== "admin") {
+	if (membership?.role !== "owner") {
 		return { redirect: { permanent: false, destination: "/" } };
 	}
 	await helpers.settings.isCloud.prefetch();

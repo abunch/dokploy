@@ -112,8 +112,9 @@ export const HandleSsoProvider = ({ provider, children }: Props) => {
 					domains: domainList,
 					settings,
 				});
+				toast.success("SSO provider updated");
 			} else {
-				await create.mutateAsync({
+				const { enabled } = await create.mutateAsync({
 					providerId,
 					issuer,
 					clientId,
@@ -121,9 +122,15 @@ export const HandleSsoProvider = ({ provider, children }: Props) => {
 					domains: domainList,
 					settings,
 				});
+				if (enabled) {
+					toast.success("SSO provider added");
+				} else {
+					toast.info(
+						"Added as inactive because an active provider already covers these domains. Use Make active to switch.",
+					);
+				}
 			}
 			await utils.forkSso.listProviders.invalidate();
-			toast.success(isEdit ? "SSO provider updated" : "SSO provider added");
 			setOpen(false);
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Could not save");

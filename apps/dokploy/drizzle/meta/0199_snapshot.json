@@ -1,5 +1,5 @@
 {
-  "id": "1a78ba11-5f97-4842-9d00-24889cc760ce",
+  "id": "87bbcd31-d680-43dd-bd7a-acc4764b26f8",
   "prevId": "4c5cd64c-f0fa-4b62-9a8e-504f2f435212",
   "version": "7",
   "dialect": "postgresql",
@@ -3586,6 +3586,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
         },
         "groups_claim": {
           "name": "groups_claim",

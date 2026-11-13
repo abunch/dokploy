@@ -1,9 +1,11 @@
 import { ssoSettingsInputSchema } from "@dokploy/server/db/schema";
 import {
-	countSsoProviders,
+	countActiveSsoProviders,
 	createSsoProvider,
 	deleteSsoProvider,
+	isProviderEnabled,
 	listSsoProviders,
+	setSsoProviderActive,
 	updateSsoProvider,
 } from "@dokploy/server/services/fork/sso-providers";
 import {
@@ -13,7 +15,7 @@ import {
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { audit } from "@/server/api/utils/audit";
-import { adminProcedure, createTRPCRouter, protectedProcedure } from "../trpc";
+import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const providerIdSchema = z
 	.string()
@@ -23,6 +25,17 @@ const providerIdSchema = z
 	.regex(/^[a-z0-9][a-z0-9-]*$/, "Use lowercase letters, numbers and dashes");
 
 const domainsSchema = z.array(z.string().trim().min(1)).min(1).max(20);
+
+// Providers decide who can sign in as which account, so only owners manage them.
+const ownerProcedure = protectedProcedure.use(({ ctx, next }) => {
+	if (ctx.user.role !== "owner") {
+		throw new TRPCError({
+			code: "FORBIDDEN",
+			message: "Only the organization owner can manage single sign-on",
+		});
+	}
+	return next();
+});
 
 const toHeaders = (raw: Record<string, string | string[] | undefined>) => {
 	const headers = new Headers();
@@ -37,11 +50,11 @@ const toHeaders = (raw: Record<string, string | string[] | undefined>) => {
 };
 
 export const forkSsoRouter = createTRPCRouter({
-	listProviders: adminProcedure.query(({ ctx }) =>
+	listProviders: ownerProcedure.query(({ ctx }) =>
 		listSsoProviders(ctx.session.activeOrganizationId),
 	),
 
-	createProvider: adminProcedure
+	createProvider: ownerProcedure
 		.input(
 			z.object({
 				providerId: providerIdSchema,
@@ -53,7 +66,7 @@ export const forkSsoRouter = createTRPCRouter({
 			}),
 		)
 		.mutation(async ({ ctx, input }) => {
-			await createSsoProvider({
+			const { enabled } = await createSsoProvider({
 				organizationId: ctx.session.activeOrganizationId,
 				headers: toHeaders(ctx.req.headers),
 				input,
@@ -63,12 +76,12 @@ export const forkSsoRouter = createTRPCRouter({
 				resourceType: "security",
 				resourceId: input.providerId,
 				resourceName: `SSO provider ${input.issuer}`,
-				metadata: { domains: input.domains, settings: input.settings },
+				metadata: { domains: input.domains, settings: input.settings, enabled },
 			});
-			return true;
+			return { enabled };
 		}),
 
-	updateProvider: adminProcedure
+	updateProvider: ownerProcedure
 		.input(
 			z.object({
 				providerId: providerIdSchema,
@@ -98,14 +111,19 @@ export const forkSsoRouter = createTRPCRouter({
 			return true;
 		}),
 
-	deleteProvider: adminProcedure
+	deleteProvider: ownerProcedure
 		.input(z.object({ providerId: providerIdSchema }))
 		.mutation(async ({ ctx, input }) => {
 			const settings = await getWebServerSettings();
-			if (settings?.enforceSSO && (await countSsoProviders()) <= 1) {
+			if (
+				settings?.enforceSSO &&
+				(await isProviderEnabled(input.providerId)) &&
+				(await countActiveSsoProviders()) <= 1
+			) {
 				throw new TRPCError({
 					code: "BAD_REQUEST",
-					message: "Turn off SSO-only before deleting the last SSO provider",
+					message:
+						"Turn off Require SSO before deleting the last active SSO provider",
 				});
 			}
 			await deleteSsoProvider({
@@ -119,6 +137,28 @@ export const forkSsoRouter = createTRPCRouter({
 				resourceName: "SSO provider",
 			});
 			return true;
+		}),
+
+	setProviderActive: ownerProcedure
+		.input(z.object({ providerId: providerIdSchema, active: z.boolean() }))
+		.mutation(async ({ ctx, input }) => {
+			const settings = await getWebServerSettings();
+			const result = await setSsoProviderActive({
+				organizationId: ctx.session.activeOrganizationId,
+				providerId: input.providerId,
+				active: input.active,
+				ssoRequired: settings?.enforceSSO ?? false,
+			});
+			await audit(ctx, {
+				action: "update",
+				resourceType: "security",
+				resourceId: input.providerId,
+				resourceName: input.active
+					? "SSO provider activated"
+					: "SSO provider deactivated",
+				metadata: { deactivated: result.deactivated },
+			});
+			return result;
 		}),
 
 	getSsoOnly: protectedProcedure.query(async () => {
@@ -135,7 +175,7 @@ export const forkSsoRouter = createTRPCRouter({
 					message: "Only the organization owner can change SSO-only mode",
 				});
 			}
-			if (input.enabled && (await countSsoProviders()) === 0) {
+			if (input.enabled && (await countActiveSsoProviders()) === 0) {
 				throw new TRPCError({
 					code: "BAD_REQUEST",
 					message: "Add an SSO provider before requiring SSO",

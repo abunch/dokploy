@@ -6,7 +6,7 @@ or specifications were used.
 
 ## What's new
 
-- **Settings → Single sign-on** (owners and admins): add, edit and delete providers with an
+- **Settings → Single sign-on** (owners only): add, edit and delete providers with an
   issuer URL, client ID, client secret and email domains. The platform validates the issuer's
   discovery document before saving and shows the redirect URI to register. Secrets are never sent
   back to the browser.
@@ -22,6 +22,13 @@ or specifications were used.
   at every SSO sign-in, so changes in the identity provider take effect at the next sign-in. The
   highest matching role wins; owners are never changed. Optional "require a mapped group" refuses
   sign-in and removes access for people in none of the groups.
+- **Switching providers without downtime**: each provider is Active or Inactive. A new provider
+  whose domains overlap an active one is added inactive, so you can set it up first; "Make active"
+  turns it on and the overlapping provider off in one step. Inactive providers get no button and
+  refuse sign-ins. People keep their Dokploy accounts across a switch (matched by email).
+- **Any groups claim shape**: a list of names (Authentik, Keycloak, Okta, Entra) or an object keyed
+  by role name (Zitadel's `urn:zitadel:iam:org:project:roles`). Auth0 needs an Action that adds a
+  custom roles claim; set its name as the provider's groups claim.
 - **Require SSO** (owner only, needs a provider): password, passkey and social sign-in and
   self-sign-up are refused for everyone except organization owners, who keep password sign-in as a
   break-glass. Owner break-glass attempts are audited.
@@ -29,8 +36,16 @@ or specifications were used.
 
 ## Security notes
 
-- A domain can belong to only one provider on the platform, including subdomains
-  (`example.com` blocks `eu.example.com` on another provider), checked on create and edit.
+- Only organization owners manage providers. A provider decides who can sign in as which account,
+  so an admin adding one could otherwise sign in as the owner.
+- An SSO sign-in links to an existing account only if that person is a member of the provider's
+  organization or of none yet, so one organization's provider cannot take over another's users.
+- Existing password users can move to SSO: linking does not require the local email to have been
+  verified, because accounts only come from invitations and only owners declare provider domains.
+
+- Another organization's provider domains (including subdomains: `example.com` covers
+  `eu.example.com`) can never be claimed. Within an organization, overlapping providers are allowed
+  only while at most one of them is active.
 - Provider management is only available through the permission-checked API; the plugin's own HTTP
   routes for registering, editing, listing and deleting providers are closed.
 - Adding a provider adds its issuer origin to the owner's trusted origins, which the plugin
@@ -43,6 +58,10 @@ or specifications were used.
 - `settings.updateEnforceSSO` is replaced by `forkSso.setSsoOnly` (owner only, needs a provider).
 
 ## Local identity provider
+
+`dev/zitadel/` runs Zitadel v4.20.3 (telemetry off) with `setup.mjs` to create a project, roles,
+an OIDC app and users; `ZITADEL_SWAP=1 scripts/sso-e2e.mjs` stages Zitadel next to Authentik,
+switches, signs in through Zitadel and switches back.
 
 `dev/authentik/` runs Authentik 2026.8.5 with update checks, error reporting and analytics off, plus
 a Dokploy OIDC app and test users alice (admins), bob (developers) and carol (no group).

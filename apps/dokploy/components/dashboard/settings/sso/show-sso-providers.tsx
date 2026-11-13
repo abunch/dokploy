@@ -1,6 +1,5 @@
 import { KeyRound, Loader2, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { AlertBlock } from "@/components/shared/alert-block";
 import { DialogAction } from "@/components/shared/dialog-action";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,6 +21,26 @@ export const ShowSsoProviders = () => {
 	const { data: ssoOnly } = api.forkSso.getSsoOnly.useQuery();
 	const { data: auth } = api.user.get.useQuery();
 	const remove = api.forkSso.deleteProvider.useMutation();
+	const setActive = api.forkSso.setProviderActive.useMutation();
+
+	const onSetActive = async (providerId: string, active: boolean) => {
+		try {
+			const { deactivated } = await setActive.mutateAsync({
+				providerId,
+				active,
+			});
+			await utils.forkSso.listProviders.invalidate();
+			toast.success(
+				active
+					? deactivated.length > 0
+						? `Switched to ${providerId}; ${deactivated.join(", ")} is now inactive`
+						: `${providerId} is now active`
+					: `${providerId} is now inactive`,
+			);
+		} catch (error) {
+			toast.error(error instanceof Error ? error.message : "Could not update");
+		}
+	};
 	const setSsoOnly = api.forkSso.setSsoOnly.useMutation();
 	const isOwner = auth?.role === "owner";
 
@@ -66,11 +85,6 @@ export const ShowSsoProviders = () => {
 								onCheckedChange={onToggleSsoOnly}
 							/>
 						</div>
-						{!isOwner && (
-							<AlertBlock type="info">
-								Only the organization owner can change whether SSO is required.
-							</AlertBlock>
-						)}
 
 						{isPending ? (
 							<div className="flex gap-2 items-center justify-center text-sm text-muted-foreground min-h-[15vh]">
@@ -98,6 +112,11 @@ export const ShowSsoProviders = () => {
 												<span className="font-medium">
 													{provider.displayName || provider.providerId}
 												</span>
+												<Badge
+													variant={provider.enabled ? "default" : "outline"}
+												>
+													{provider.enabled ? "Active" : "Inactive"}
+												</Badge>
 												{provider.domains.map((domain) => (
 													<Badge key={domain} variant="secondary">
 														{domain}
@@ -117,7 +136,21 @@ export const ShowSsoProviders = () => {
 													" · mapped group required"}
 											</p>
 										</div>
-										<div className="flex gap-1">
+										<div className="flex items-center gap-1">
+											<Button
+												variant="outline"
+												size="sm"
+												isLoading={
+													setActive.isPending &&
+													setActive.variables?.providerId ===
+														provider.providerId
+												}
+												onClick={() =>
+													onSetActive(provider.providerId, !provider.enabled)
+												}
+											>
+												{provider.enabled ? "Deactivate" : "Make active"}
+											</Button>
 											<HandleSsoProvider provider={provider}>
 												<Button variant="ghost" size="icon">
 													<Pencil className="size-4" />
