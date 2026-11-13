@@ -1,5 +1,5 @@
 {
-  "id": "87bbcd31-d680-43dd-bd7a-acc4764b26f8",
+  "id": "811cae4c-5869-4eff-a6ec-7f148a9f8ca6",
   "prevId": "4c5cd64c-f0fa-4b62-9a8e-504f2f435212",
   "version": "7",
   "dialect": "postgresql",
@@ -3560,80 +3560,6 @@
           ],
           "columnsTo": [
             "projectId"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.fork_sso_settings": {
-      "name": "fork_sso_settings",
-      "schema": "",
-      "columns": {
-        "provider_id": {
-          "name": "provider_id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "display_name": {
-          "name": "display_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "enabled": {
-          "name": "enabled",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "groups_claim": {
-          "name": "groups_claim",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'groups'"
-        },
-        "role_mappings": {
-          "name": "role_mappings",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'[]'::jsonb"
-        },
-        "default_role": {
-          "name": "default_role",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'member'"
-        },
-        "require_mapped_group": {
-          "name": "require_mapped_group",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "fork_sso_settings_provider_id_sso_provider_provider_id_fk": {
-          "name": "fork_sso_settings_provider_id_sso_provider_provider_id_fk",
-          "tableFrom": "fork_sso_settings",
-          "tableTo": "sso_provider",
-          "columnsFrom": [
-            "provider_id"
-          ],
-          "columnsTo": [
-            "provider_id"
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"
@@ -8014,6 +7940,67 @@
           ],
           "columnsTo": [
             "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.fork_sso_settings": {
+      "name": "fork_sso_settings",
+      "schema": "",
+      "columns": {
+        "provider_id": {
+          "name": "provider_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "groups_claim": {
+          "name": "groups_claim",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'groups'"
+        },
+        "role_mappings": {
+          "name": "role_mappings",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "default_role": {
+          "name": "default_role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'member'"
+        },
+        "require_mapped_group": {
+          "name": "require_mapped_group",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "fork_sso_settings_provider_id_sso_provider_provider_id_fk": {
+          "name": "fork_sso_settings_provider_id_sso_provider_provider_id_fk",
+          "tableFrom": "fork_sso_settings",
+          "tableTo": "sso_provider",
+          "columnsFrom": [
+            "provider_id"
+          ],
+          "columnsTo": [
+            "provider_id"
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"

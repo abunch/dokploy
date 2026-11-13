@@ -54,7 +54,8 @@ or specifications were used.
 
 ## Operator changes
 
-- One additive migration: `fork_sso_settings`.
+- Two additive migrations: `0199` creates `fork_sso_settings`; `0200` adds `display_name` and
+  `enabled`.
 - `settings.updateEnforceSSO` is replaced by `forkSso.setSsoOnly` (owner only, needs a provider).
 
 ## Local identity provider
