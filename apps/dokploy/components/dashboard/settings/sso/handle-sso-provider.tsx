@@ -56,6 +56,7 @@ export const HandleSsoProvider = ({ provider, children }: Props) => {
 	const [open, setOpen] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [providerId, setProviderId] = useState("");
+	const [displayName, setDisplayName] = useState("");
 	const [issuer, setIssuer] = useState("");
 	const [clientId, setClientId] = useState("");
 	const [clientSecret, setClientSecret] = useState("");
@@ -73,6 +74,7 @@ export const HandleSsoProvider = ({ provider, children }: Props) => {
 		if (!open) return;
 		setError(null);
 		setProviderId(provider?.providerId ?? "");
+		setDisplayName(provider?.displayName ?? "");
 		setIssuer(provider?.issuer ?? "");
 		setClientId(provider?.clientId ?? "");
 		setClientSecret("");
@@ -92,6 +94,7 @@ export const HandleSsoProvider = ({ provider, children }: Props) => {
 		setError(null);
 		try {
 			const settings = {
+				displayName: displayName.trim() || undefined,
 				groupsClaim: groupsClaim.trim() || "groups",
 				roleMappings: parseMappings(mappings),
 				defaultRole,
@@ -109,8 +112,9 @@ export const HandleSsoProvider = ({ provider, children }: Props) => {
 					domains: domainList,
 					settings,
 				});
+				toast.success("SSO provider updated");
 			} else {
-				await create.mutateAsync({
+				const { enabled } = await create.mutateAsync({
 					providerId,
 					issuer,
 					clientId,
@@ -118,9 +122,15 @@ export const HandleSsoProvider = ({ provider, children }: Props) => {
 					domains: domainList,
 					settings,
 				});
+				if (enabled) {
+					toast.success("SSO provider added");
+				} else {
+					toast.info(
+						"Added as inactive because an active provider already covers these domains. Use Make active to switch.",
+					);
+				}
 			}
 			await utils.forkSso.listProviders.invalidate();
-			toast.success(isEdit ? "SSO provider updated" : "SSO provider added");
 			setOpen(false);
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Could not save");
@@ -153,6 +163,20 @@ export const HandleSsoProvider = ({ provider, children }: Props) => {
 							disabled={isEdit}
 							onChange={(e) => setProviderId(e.target.value.toLowerCase())}
 						/>
+					</div>
+					<div className="grid gap-2">
+						<Label htmlFor="sso-display-name">Button label</Label>
+						<Input
+							id="sso-display-name"
+							placeholder="Company SSO"
+							maxLength={50}
+							value={displayName}
+							onChange={(e) => setDisplayName(e.target.value)}
+						/>
+						<p className="text-xs text-muted-foreground">
+							Shown on the sign-in page as "Sign in with …". Anyone who opens
+							the sign-in page can see it.
+						</p>
 					</div>
 					{callbackUrl && (
 						<div className="grid gap-2">

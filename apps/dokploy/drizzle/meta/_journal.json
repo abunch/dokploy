@@ -1401,6 +1401,13 @@
       "when": 1794523950921,
       "tag": "0199_fork_sso_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 200,
+      "version": "7",
+      "when": 1794591538436,
+      "tag": "0200_fork_sso_switching",
+      "breakpoints": true
     }
   ]
 }

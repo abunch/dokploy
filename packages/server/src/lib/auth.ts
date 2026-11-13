@@ -28,7 +28,9 @@ import {
 import {
 	checkSsoOnlySignIn,
 	getSsoRoleSettings,
+	isSsoAccountLinkAllowed,
 	readGroupsClaim,
+	resolveSsoStart,
 	syncSsoMembership,
 } from "../services/fork/sso-roles";
 import {
@@ -121,6 +123,10 @@ const createBetterAuth = () =>
 					return ["github", "google", ...fromDb];
 				},
 				allowDifferentEmails: true,
+				// Existing users must be able to move to SSO. Safe because nobody can self-register an
+				// email (invitations only), only owners add providers and assert their domains, and links
+				// are limited to members of the provider's organization (account.create hook).
+				requireLocalEmailVerified: false,
 			},
 		},
 		appName: "Dokploy",
@@ -164,6 +170,36 @@ const createBetterAuth = () =>
 								),
 							);
 					}
+				}
+
+				const ssoStart = await resolveSsoStart(
+					ctx.path,
+					ctx.body,
+					ctx.params as { providerId?: string } | undefined,
+				);
+				if (ssoStart.status === "refused") {
+					if (ctx.path.startsWith("/sso/callback")) {
+						throw ctx.redirect(
+							`${ctx.context.baseURL.replace(/\/api\/auth$/, "")}/?error=sso_provider_inactive`,
+						);
+					}
+					throw new APIError("NOT_FOUND", {
+						message:
+							ssoStart.reason === "inactive"
+								? "That sign-in provider is not active."
+								: "No single sign-on is set up for that email domain.",
+					});
+				}
+				if (
+					ssoStart.status === "allowed" &&
+					ctx.path.startsWith("/sign-in/sso")
+				) {
+					// Route by the active provider so an inactive one sharing the domain is never chosen.
+					return {
+						context: {
+							body: { ...ctx.body, providerId: ssoStart.providerId },
+						},
+					};
 				}
 
 				const ssoOnly = await checkSsoOnlySignIn(
@@ -243,6 +279,23 @@ const createBetterAuth = () =>
 			},
 		},
 		databaseHooks: {
+			account: {
+				create: {
+					before: async (account) => {
+						if (
+							!(await isSsoAccountLinkAllowed(
+								account.userId,
+								account.providerId,
+							))
+						) {
+							throw new APIError("FORBIDDEN", {
+								message:
+									"This account belongs to another organization and cannot be linked to this sign-in provider.",
+							});
+						}
+					},
+				},
+			},
 			user: {
 				create: {
 					before: async (_user, context) => {
@@ -500,6 +553,9 @@ const createBetterAuth = () =>
 			}),
 			sso({
 				trustEmailVerified: true,
+				// Existing accounts are linked only for a provider trusted for the email's domain. Domain
+				// ownership is asserted by the organization owner when adding the provider (no DNS check).
+				domainVerification: { enabled: true },
 				provisionUserOnEveryLogin: true,
 				provisionUser: async ({ user, userInfo, token, provider }) => {
 					if (!provider.organizationId) return;

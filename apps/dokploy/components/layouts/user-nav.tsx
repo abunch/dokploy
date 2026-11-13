@@ -138,7 +138,7 @@ export const UserNav = () => {
 					className="cursor-pointer"
 					onClick={async () => {
 						await authClient.signOut().then(() => {
-							router.push("/");
+							router.push("/?signed_out=1");
 						});
 						// await mutateAsync().then(() => {
 						// 	router.push("/");

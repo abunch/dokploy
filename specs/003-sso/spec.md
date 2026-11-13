@@ -128,15 +128,21 @@ the owner's password sign-in still works.
 
 ### Functional Requirements
 
-- **FR-001**: Owners and admins MUST be able to create, view, edit and delete OIDC providers for
-  their organization; members MUST NOT.
+- **FR-001**: Owners MUST be able to create, view, edit, activate, deactivate and delete OIDC
+  providers for their organization; admins and members MUST NOT (a provider decides who can sign
+  in as which account). Overlapping providers in one organization MAY exist while at most one is
+  active; activating one MUST deactivate the overlapping active ones in one step.
 - **FR-002**: Creating or editing a provider MUST validate the issuer's discovery document from the
   platform server and refuse to save on failure, showing the reason.
-- **FR-003**: A domain MUST belong to at most one provider across the whole platform, checked on
-  both create and edit.
+- **FR-003**: A domain MUST NOT overlap another organization's provider domains, checked on both
+  create and edit. An SSO identity MUST link to an existing account only when that person belongs
+  to the provider's organization or to none.
 - **FR-004**: Client secrets MUST never be returned to the browser after saving.
-- **FR-005**: The sign-in page MUST offer SSO: the person enters their email and is sent to the
-  provider for that email's domain.
+- **FR-005**: The sign-in page MUST offer one-click SSO: a button per provider, labelled with its
+  display name, that goes straight to the provider. With more than three providers it MUST instead
+  ask for an email and route by domain. With SSO required and one provider, opening the sign-in
+  page MUST go straight to the provider, except after sign-out, after an error, or with
+  `?password=1`.
 - **FR-006**: A first SSO sign-in MUST create the account and organization membership without an
   invitation.
 - **FR-007**: An SSO sign-in for an email that already has an account MUST sign in to that account.

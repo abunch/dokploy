@@ -4,6 +4,10 @@ import {
 	isAdminPresent,
 } from "@dokploy/server";
 import { validateRequest } from "@dokploy/server/lib/auth";
+import {
+	getSsoLoginOptions,
+	type SsoLoginOptions,
+} from "@dokploy/server/services/fork/sso-roles";
 import { standardSchemaResolver as zodResolver } from "@hookform/resolvers/standard-schema";
 import { Fingerprint, KeyRound } from "lucide-react";
 import type { GetServerSidePropsContext } from "next";
@@ -55,13 +59,28 @@ type LoginForm = z.infer<typeof LoginSchema>;
 interface Props {
 	IS_CLOUD: boolean;
 	ssoOnly?: boolean;
+	sso?: SsoLoginOptions;
 }
-export default function Home({ IS_CLOUD, ssoOnly = false }: Props) {
+const noSso: SsoLoginOptions = {
+	buttons: [],
+	emailRouting: false,
+	autoRedirectProviderId: null,
+};
+
+export default function Home({
+	IS_CLOUD,
+	ssoOnly = false,
+	sso = noSso,
+}: Props) {
 	const router = useRouter();
 	const { config: whitelabeling } = useWhitelabelingPublic();
 	const [isLoginLoading, setIsLoginLoading] = useState(false);
 	const [isPasskeyLoading, setIsPasskeyLoading] = useState(false);
 	const [isSsoLoading, setIsSsoLoading] = useState(false);
+	const [ssoProviderLoading, setSsoProviderLoading] = useState<string | null>(
+		null,
+	);
+	const [showPasswordForm, setShowPasswordForm] = useState(!ssoOnly);
 	const [isTwoFactorLoading, setIsTwoFactorLoading] = useState(false);
 	const [isBackupCodeLoading, setIsBackupCodeLoading] = useState(false);
 	const [isTwoFactor, setIsTwoFactor] = useState(false);
@@ -92,13 +111,15 @@ export default function Home({ IS_CLOUD, ssoOnly = false }: Props) {
 		const normalized = raw.replace(/[+_]/g, " ").toLowerCase();
 
 		setError(
-			normalized.includes("sso not allowed")
-				? "Your account is not in a group that is allowed to sign in. Ask your administrator for access."
-				: normalized.includes("account not linked")
-					? "This account already exists but isn't linked to that sign-in provider yet. Contact your administrator to link it."
-					: normalized.includes("access denied")
-						? "Access was denied by the identity provider."
-						: "We couldn't complete sign-in. Please try again or contact your administrator.",
+			normalized.includes("sso provider inactive")
+				? "That sign-in provider is no longer active. Try again from the sign-in page."
+				: normalized.includes("sso not allowed")
+					? "Your account is not in a group that is allowed to sign in. Ask your administrator for access."
+					: normalized.includes("account not linked")
+						? "This account already exists but isn't linked to that sign-in provider yet. Contact your administrator to link it."
+						: normalized.includes("access denied")
+							? "Access was denied by the identity provider."
+							: "We couldn't complete sign-in. Please try again or contact your administrator.",
 		);
 
 		const { error: _removed, ...rest } = router.query;
@@ -171,6 +192,34 @@ export default function Home({ IS_CLOUD, ssoOnly = false }: Props) {
 			setIsSsoLoading(false);
 		}
 	};
+
+	const onProviderSignIn = async (providerId: string) => {
+		setSsoProviderLoading(providerId);
+		setError(null);
+		const { error } = await authClient.signIn.sso({
+			providerId,
+			callbackURL: "/dashboard/home",
+			errorCallbackURL: "/",
+		});
+		if (error) {
+			setError(error.message || "Could not start single sign-on.");
+			setSsoProviderLoading(null);
+		}
+	};
+
+	useEffect(() => {
+		if (!router.isReady) return;
+		if (router.query.password === "1") {
+			setShowPasswordForm(true);
+			return;
+		}
+		// Skipped after sign-out and errors: the identity provider would sign the person straight back in, or loop.
+		const skip = router.query.error || router.query.signed_out;
+		if (sso.autoRedirectProviderId && !skip) {
+			void onProviderSignIn(sso.autoRedirectProviderId);
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [router.isReady]);
 
 	const onPasskeySignIn = async () => {
 		setIsPasskeyLoading(true);
@@ -261,78 +310,115 @@ export default function Home({ IS_CLOUD, ssoOnly = false }: Props) {
 		}
 	};
 
-	const loginContent = (
-		<>
-			<Form {...loginForm}>
-				<form
-					method="post"
-					onSubmit={loginForm.handleSubmit(onSubmit)}
-					className="space-y-4"
-					id="login-form"
-				>
-					<FormField
-						control={loginForm.control}
-						name="email"
-						render={({ field }) => (
-							<FormItem>
-								<FormLabel>Email</FormLabel>
-								<FormControl>
-									<Input placeholder="john@example.com" {...field} />
-								</FormControl>
-								<FormMessage />
-							</FormItem>
-						)}
-					/>
-					<FormField
-						control={loginForm.control}
-						name="password"
-						render={({ field }) => (
-							<FormItem>
-								<FormLabel>Password</FormLabel>
-								<FormControl>
-									<Input
-										type="password"
-										placeholder="Enter your password"
-										{...field}
-									/>
-								</FormControl>
-								<FormMessage />
-							</FormItem>
-						)}
-					/>
-					{ssoOnly && (
-						<Button
-							className="w-full"
-							type="button"
-							onClick={onSsoSignIn}
-							isLoading={isSsoLoading}
+	const providerButtons = sso.buttons.map((provider) => (
+		<Button
+			key={provider.providerId}
+			className="w-full"
+			variant={ssoOnly ? "default" : "outline"}
+			type="button"
+			onClick={() => onProviderSignIn(provider.providerId)}
+			isLoading={ssoProviderLoading === provider.providerId}
+		>
+			<KeyRound className="size-4" />
+			Sign in with {provider.label}
+		</Button>
+	));
+
+	const emailField = (
+		<FormField
+			control={loginForm.control}
+			name="email"
+			render={({ field }) => (
+				<FormItem>
+					<FormLabel>Email</FormLabel>
+					<FormControl>
+						<Input placeholder="john@example.com" {...field} />
+					</FormControl>
+					<FormMessage />
+				</FormItem>
+			)}
+		/>
+	);
+
+	const emailSsoButton = sso.emailRouting && (
+		<Button
+			className="w-full"
+			variant={ssoOnly ? "default" : "outline"}
+			type="button"
+			onClick={onSsoSignIn}
+			isLoading={isSsoLoading}
+		>
+			<KeyRound className="size-4" />
+			Sign in with SSO
+		</Button>
+	);
+
+	const loginContent =
+		ssoOnly && !showPasswordForm ? (
+			<div className="space-y-4">
+				{providerButtons}
+				{sso.emailRouting && (
+					<Form {...loginForm}>
+						<form
+							className="space-y-4"
+							onSubmit={(event) => {
+								event.preventDefault();
+								void onSsoSignIn();
+							}}
 						>
-							<KeyRound className="size-4" />
-							Sign in with SSO
+							{emailField}
+							{emailSsoButton}
+						</form>
+					</Form>
+				)}
+				<Button
+					variant="link"
+					className="w-full text-muted-foreground"
+					type="button"
+					onClick={() => setShowPasswordForm(true)}
+				>
+					Organization owner? Sign in with your password
+				</Button>
+			</div>
+		) : (
+			<>
+				<Form {...loginForm}>
+					<form
+						method="post"
+						onSubmit={loginForm.handleSubmit(onSubmit)}
+						className="space-y-4"
+						id="login-form"
+					>
+						{emailField}
+						<FormField
+							control={loginForm.control}
+							name="password"
+							render={({ field }) => (
+								<FormItem>
+									<FormLabel>Password</FormLabel>
+									<FormControl>
+										<Input
+											type="password"
+											placeholder="Enter your password"
+											{...field}
+										/>
+									</FormControl>
+									<FormMessage />
+								</FormItem>
+							)}
+						/>
+						<Button className="w-full" type="submit" isLoading={isLoginLoading}>
+							{ssoOnly ? "Owner sign-in with password" : "Login"}
 						</Button>
-					)}
-					<Button
-						className="w-full"
-						variant={ssoOnly ? "outline" : "default"}
-						type="submit"
-						isLoading={isLoginLoading}
-					>
-						{ssoOnly ? "Owner sign-in with password" : "Login"}
-					</Button>
-				</form>
-			</Form>
-			{!ssoOnly && (
-				<>
-					<Button
-						variant="outline"
-						className="w-full mt-4"
-						type="button"
-						onClick={onSsoSignIn}
-						isLoading={isSsoLoading}
-					>
-						<KeyRound className="size-4" />
-						Sign in with SSO
-					</Button>
+					</form>
+				</Form>
+				{(providerButtons.length > 0 || sso.emailRouting) && (
+					<div className="mt-4 space-y-4">
+						{providerButtons}
+						{emailSsoButton}
+					</div>
+				)}
+				{!ssoOnly && (
 					<Button
 						variant="outline"
 						className="w-full mt-4"
@@ -343,10 +429,9 @@ export default function Home({ IS_CLOUD, ssoOnly = false }: Props) {
 						<Fingerprint className="size-4" />
 						Sign in with Passkey
 					</Button>
-				</>
-			)}
-		</>
-	);
+				)}
+			</>
+		);
 
 	const forgotPasswordContent = (
 		<div className="flex flex-col gap-4">
@@ -639,6 +724,7 @@ export async function getServerSideProps(context: GetServerSidePropsContext) {
 			trpcState: helpers.dehydrate(),
 			hasAdmin,
 			ssoOnly: settings?.enforceSSO ?? false,
+			sso: await getSsoLoginOptions(settings?.enforceSSO ?? false),
 		},
 	};
 }

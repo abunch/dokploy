@@ -99,17 +99,69 @@ const authentikLogin = async (jar, authorizeUrl, username, password) => {
 	throw new Error("Authentik login did not finish");
 };
 
-const signInWithSso = async (email, username, password) => {
+const ZITADEL_URL = process.env.ZITADEL_URL ?? "http://localhost:8085";
+
+const formFields = (html) => {
+	const action = html.match(/<form[^>]*action="([^"]+)"/)?.[1];
+	const fields = {};
+	for (const input of html.matchAll(/<input[^>]*>/g)) {
+		const name = input[0].match(/name="([^"]+)"/)?.[1];
+		const value = input[0].match(/value="([^"]*)"/)?.[1] ?? "";
+		if (name)
+			fields[name] = value.replaceAll("&#43;", "+").replaceAll("&amp;", "&");
+	}
+	return { action, fields };
+};
+
+// Drives Zitadel's classic login pages: login name, password, then the optional MFA prompt.
+const zitadelLogin = async (jar, authorizeUrl, username, password) => {
+	let { response, url } = await follow(jar, authorizeUrl);
+	for (let step = 0; step < 8; step++) {
+		if (url.startsWith(PLATFORM_URL)) return url;
+		const html = await response.text();
+		const { action, fields } = formFields(html);
+		if (!action) throw new Error(`No form on Zitadel page ${url}`);
+		if (action.includes("loginname")) fields.loginName = username;
+		else if (action.includes("password")) fields.password = password;
+		else if (action.includes("mfa/prompt")) fields.skip = "true";
+		else throw new Error(`Unexpected Zitadel page ${action}`);
+		const posted = await request(jar, new URL(action, ZITADEL_URL).toString(), {
+			method: "POST",
+			headers: { "content-type": "application/x-www-form-urlencoded" },
+			body: new URLSearchParams(fields).toString(),
+		});
+		const location = posted.headers.get("location");
+		if (location) {
+			({ response, url } = await follow(
+				jar,
+				new URL(location, ZITADEL_URL).toString(),
+			));
+		} else {
+			response = posted;
+		}
+	}
+	throw new Error("Zitadel login did not finish");
+};
+
+// Starts from the email (domain routing) or, with providerId, the way a sign-in button does.
+const signInWithSso = async (email, username, password, providerId) => {
 	const jar = new Jar();
 	const start = await request(jar, `${PLATFORM_URL}/api/auth/sign-in/sso`, {
 		method: "POST",
 		headers: { "content-type": "application/json", origin: PLATFORM_URL },
-		body: JSON.stringify({ email, callbackURL: "/dashboard/home" }),
+		body: JSON.stringify({
+			...(providerId ? { providerId } : { email }),
+			callbackURL: "/dashboard/home",
+		}),
 	});
 	const body = await start.json();
 	if (!body.url) throw new Error(`SSO start failed: ${JSON.stringify(body)}`);
 
-	const callbackUrl = await authentikLogin(jar, body.url, username, password);
+	const login =
+		new URL(body.url).origin === new URL(ZITADEL_URL).origin
+			? zitadelLogin
+			: authentikLogin;
+	const callbackUrl = await login(jar, body.url, username, password);
 	const callback = await request(jar, callbackUrl);
 	const landed = callback.headers.get("location") ?? "";
 	return { jar, landed };
@@ -153,6 +205,21 @@ for (const [email, username, password, expectedRole] of users) {
 	} catch (error) {
 		check(`${username} signs in with SSO`, false, error.message);
 	}
+}
+
+{
+	const { jar, landed } = await signInWithSso(
+		undefined,
+		"bob",
+		"bob-dev-password",
+		"authentik",
+	);
+	const member = await trpc(jar, "user.get");
+	check(
+		"one-click sign-in by provider (no email) works",
+		landed.includes("/dashboard") && member?.user?.email === "bob@dokploy.test",
+		`landed ${landed}`,
+	);
 }
 
 const AUTHENTIK_URL = process.env.AUTHENTIK_URL ?? "http://localhost:9000";
@@ -326,6 +393,104 @@ if (ownerEmail && ownerPassword) {
 	} finally {
 		await setSsoOnly(false);
 	}
+}
+
+if (process.env.ZITADEL_SWAP === "1" && ownerEmail && ownerPassword) {
+	const ownerJar = new Jar();
+	await request(ownerJar, `${PLATFORM_URL}/api/auth/sign-in/email`, {
+		method: "POST",
+		headers: { "content-type": "application/json", origin: PLATFORM_URL },
+		body: JSON.stringify({ email: ownerEmail, password: ownerPassword }),
+	});
+	const setActive = async (providerId) => {
+		const response = await request(
+			ownerJar,
+			`${PLATFORM_URL}/api/trpc/forkSso.setProviderActive`,
+			{
+				method: "POST",
+				headers: { "content-type": "application/json", origin: PLATFORM_URL },
+				body: JSON.stringify({ json: { providerId, active: true } }),
+			},
+		);
+		return (await response.json()).result?.data?.json;
+	};
+	const startStatus = async (providerId) =>
+		(
+			await fetch(`${PLATFORM_URL}/api/auth/sign-in/sso`, {
+				method: "POST",
+				headers: { "content-type": "application/json", origin: PLATFORM_URL },
+				body: JSON.stringify({ providerId, callbackURL: "/dashboard/home" }),
+			})
+		).status;
+	const whoAmI = async (email, username, password, providerId) => {
+		const { jar } = await signInWithSso(email, username, password, providerId);
+		return trpc(jar, "user.get");
+	};
+
+	const before = await whoAmI(
+		"alice@dokploy.test",
+		"alice",
+		"alice-dev-password",
+	);
+	check(
+		"staged Zitadel cannot be used while inactive",
+		(await startStatus("zitadel")) === 404,
+	);
+
+	const swap = await setActive("zitadel");
+	check(
+		"making Zitadel active deactivates Authentik in one step",
+		swap?.deactivated?.includes("authentik"),
+		JSON.stringify(swap),
+	);
+	check(
+		"Authentik cannot be used once inactive",
+		(await startStatus("authentik")) === 404,
+	);
+
+	const alice = await whoAmI(
+		"alice@dokploy.test",
+		"alice",
+		"alice-zitadel-dev-Password1!",
+		"zitadel",
+	);
+	check(
+		"alice signs in through Zitadel as admin from Zitadel's role object",
+		alice?.role === "admin",
+		`role ${alice?.role}`,
+	);
+	check(
+		"alice keeps the same Dokploy account after the switch",
+		alice?.userId === before?.userId,
+		`${before?.userId} → ${alice?.userId}`,
+	);
+	const bob = await whoAmI(
+		"bob@dokploy.test",
+		"bob",
+		"bob-zitadel-dev-Password1!",
+		"zitadel",
+	);
+	check(
+		"bob signs in through Zitadel as member",
+		bob?.role === "member",
+		`role ${bob?.role}`,
+	);
+
+	const viaEmail = await whoAmI(
+		"bob@dokploy.test",
+		"bob",
+		"bob-zitadel-dev-Password1!",
+	);
+	check(
+		"email routing picks the active provider (Zitadel)",
+		viaEmail?.role === "member",
+	);
+
+	const back = await setActive("authentik");
+	check(
+		"switching back to Authentik works",
+		back?.deactivated?.includes("zitadel"),
+	);
 }
 
 process.exit(results.every(Boolean) ? 0 : 1);
